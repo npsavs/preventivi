@@ -67,41 +67,37 @@ export default function Stampa() {
     setSending(true)
     try {
       const { blob, nomeFile } = await creaPdf()
-      const file = new File([blob], nomeFile, { type: 'application/pdf' })
+
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = nomeFile
+      a.click()
+
       const oggetto = `Preventivo ${client?.name || 'cliente'}`
       const testo = `Buongiorno,\n\nin allegato il preventivo richiesto.\n\nCordiali saluti\nNuovo Punto Sicurezza`
 
-      const canShare = typeof navigator.share === 'function' && navigator.canShare?.({ files: [file] })
+      if (tipo === 'email') {
+        const gmail =
+          'https://mail.google.com/mail/?view=cm&fs=1' +
+          (client?.email ? `&to=${encodeURIComponent(client.email)}` : '') +
+          `&su=${encodeURIComponent(oggetto)}` +
+          `&body=${encodeURIComponent(testo)}`
+        window.open(gmail, '_blank')
+      }
 
-      if (canShare) {
-        await navigator.share({
-          files: [file],
-          title: oggetto,
-          text: testo,
-        })
-      } else {
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = nomeFile
-        a.click()
-        URL.revokeObjectURL(url)
-
-        if (tipo === 'email' && client?.email) {
-          window.location.href = `mailto:${client.email}?subject=${encodeURIComponent(oggetto)}&body=${encodeURIComponent(testo)}`
-        } else if (tipo === 'whatsapp') {
-          const phone = (client?.phone || '').replace(/\D/g, '').replace(/^39/, '')
-          if (phone) {
-            window.open(`https://wa.me/39${phone}?text=${encodeURIComponent(testo)}`, '_blank')
-          } else {
-            alert('Manca il telefono del cliente')
-          }
+      if (tipo === 'whatsapp') {
+        const phone = (client?.phone || '').replace(/\D/g, '').replace(/^39/, '')
+        if (phone) {
+          window.open(`https://wa.me/39${phone}?text=${encodeURIComponent(testo)}`, '_blank')
         } else {
-          alert('PDF scaricato. Allegalo alla mail.')
+          alert('Manca il telefono del cliente')
         }
       }
+
+      setTimeout(() => URL.revokeObjectURL(url), 2000)
     } catch (e: any) {
-      if (e?.name !== 'AbortError') alert('Errore: ' + (e.message || e))
+      alert('Errore: ' + (e.message || e))
     }
     setSending(false)
   }
