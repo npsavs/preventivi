@@ -9,12 +9,14 @@ LA GARANZIA COPRE TUTTI I PRODOTTI PER 24 MESI E SARA' GESTITA DIRETTAMENTE DA N
 export default function Editor() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const clienteFromUrl = new URLSearchParams(window.location.search).get('cliente')
+
   const [quoteId, setQuoteId] = useState<string | null>(id || null)
   const [clients, setClients] = useState<Client[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [materials, setMaterials] = useState<Material[]>([])
   const [items, setItems] = useState<QuoteItem[]>([])
-  const [clientId, setClientId] = useState('')
+  const [clientId, setClientId] = useState(clienteFromUrl || '')
   const [search, setSearch] = useState('')
   const [oggetto, setOggetto] = useState('')
   const [footerNotes, setFooterNotes] = useState(NOTE_DEFAULT)
@@ -36,7 +38,7 @@ export default function Editor() {
       const { data: q } = await supabase.from('quotes').select('*').eq('id', id).single()
       if (q) {
         setQuoteId(q.id)
-        setClientId(q.client_id || '')
+        setClientId(q.client_id || clienteFromUrl || '')
         setOggetto(q.oggetto || q.notes || '')
         setFooterNotes(q.footer_notes || NOTE_DEFAULT)
         setQuoteNumber(q.quote_number || '')
@@ -51,12 +53,14 @@ export default function Editor() {
           quote_number: num,
           status: 'bozza',
           footer_notes: NOTE_DEFAULT,
+          client_id: clienteFromUrl || null,
         })
         .select()
         .single()
       if (q) {
         setQuoteId(q.id)
         setQuoteNumber(num)
+        if (clienteFromUrl) setClientId(clienteFromUrl)
         navigate(`/preventivo/${q.id}`, { replace: true })
       }
     }
@@ -161,9 +165,6 @@ export default function Editor() {
           className="w-full border rounded-lg px-3 py-2"
           rows={6}
         />
-        <p className="text-xs text-slate-500">
-          La data di validità (30 giorni) viene aggiunta in automatico in stampa.
-        </p>
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
