@@ -29,7 +29,6 @@ export default function Stampa() {
   async function creaPdf() {
     const el = document.getElementById('foglio-preventivo')
     if (!el) throw new Error('Foglio non trovato')
-
     const canvas = await html2canvas(el, {
       scale: 2,
       useCORS: true,
@@ -37,21 +36,12 @@ export default function Stampa() {
       onclone: (doc) => {
         const style = doc.createElement('style')
         style.innerHTML = `
-          #foglio-preventivo {
-            background: #ffffff !important;
-            color: #262626 !important;
-          }
-          #foglio-preventivo * {
-            color: #262626 !important;
-            background-color: transparent !important;
-            border-color: #a3a3a3 !important;
-            box-shadow: none !important;
-          }
+          #foglio-preventivo { background:#fff !important; color:#262626 !important; }
+          #foglio-preventivo * { color:#262626 !important; background-color:transparent !important; border-color:#a3a3a3 !important; box-shadow:none !important; }
         `
         doc.head.appendChild(style)
       },
     })
-
     const img = canvas.toDataURL('image/jpeg', 0.95)
     const pdf = new jsPDF('p', 'mm', 'a4')
     const pageW = pdf.internal.pageSize.getWidth()
@@ -59,42 +49,31 @@ export default function Stampa() {
     const imgH = (canvas.height * pageW) / canvas.width
     pdf.addImage(img, 'JPEG', 0, 0, pageW, Math.min(imgH, pageH))
     const nomeFile = `Preventivo_${(client?.name || 'cliente').replace(/\s+/g, '_')}.pdf`
-    return { pdf, nomeFile, blob: pdf.output('blob') }
+    return { nomeFile, blob: pdf.output('blob') }
   }
 
   async function invia(tipo: 'email' | 'whatsapp') {
-    if (!quote) return
     setSending(true)
     try {
       const { blob, nomeFile } = await creaPdf()
-
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
       a.download = nomeFile
       a.click()
-
       const oggetto = `Preventivo ${client?.name || 'cliente'}`
       const testo = `Buongiorno,\n\nin allegato il preventivo richiesto.\n\nCordiali saluti\nNuovo Punto Sicurezza`
-
       if (tipo === 'email') {
-        const gmail =
-          'https://mail.google.com/mail/?view=cm&fs=1' +
+        const gmail = 'https://mail.google.com/mail/?view=cm&fs=1' +
           (client?.email ? `&to=${encodeURIComponent(client.email)}` : '') +
-          `&su=${encodeURIComponent(oggetto)}` +
-          `&body=${encodeURIComponent(testo)}`
+          `&su=${encodeURIComponent(oggetto)}&body=${encodeURIComponent(testo)}`
         window.open(gmail, '_blank')
       }
-
       if (tipo === 'whatsapp') {
         const phone = (client?.phone || '').replace(/\D/g, '').replace(/^39/, '')
-        if (phone) {
-          window.open(`https://wa.me/39${phone}?text=${encodeURIComponent(testo)}`, '_blank')
-        } else {
-          alert('Manca il telefono del cliente')
-        }
+        if (phone) window.open(`https://wa.me/39${phone}?text=${encodeURIComponent(testo)}`, '_blank')
+        else alert('Manca il telefono del cliente')
       }
-
       setTimeout(() => URL.revokeObjectURL(url), 2000)
     } catch (e: any) {
       alert('Errore: ' + (e.message || e))
@@ -116,17 +95,13 @@ export default function Stampa() {
       <div className="no-print flex flex-wrap gap-3 max-w-[210mm] mx-auto py-4 px-4">
         <Link to={`/preventivo/${id}`} className="bg-white border px-4 py-2 text-sm">← Modifica</Link>
         <button onClick={() => window.print()} className="bg-neutral-800 text-white px-4 py-2 text-sm">Stampa / PDF</button>
-        <button disabled={sending} onClick={() => invia('email')} className="bg-sky-700 text-white px-4 py-2 text-sm disabled:opacity-50">
-          {sending ? 'Preparazione...' : 'Invia email'}
-        </button>
-        <button disabled={sending} onClick={() => invia('whatsapp')} className="bg-green-600 text-white px-4 py-2 text-sm disabled:opacity-50">
-          {sending ? 'Preparazione...' : 'WhatsApp'}
-        </button>
+        <button disabled={sending} onClick={() => invia('email')} className="bg-sky-700 text-white px-4 py-2 text-sm">Invia email</button>
+        <button disabled={sending} onClick={() => invia('whatsapp')} className="bg-green-600 text-white px-4 py-2 text-sm">WhatsApp</button>
       </div>
 
       <article id="foglio-preventivo" className="bg-white w-[210mm] min-h-[297mm] mx-auto px-12 py-10 text-[12px] text-neutral-800 print:w-auto">
         <header className="flex justify-between items-start">
-          <img src="/logo.png" alt="NPS" className="h-[70px] w-[70px] object-contain" />
+          <img src="/logo.png" alt="NPS" className="h-[110px] w-[110px] object-contain" />
           <div className="text-right text-[11px] leading-5">
             <p className="font-semibold">Nuovo Punto Sicurezza snc</p>
             <p>Via Claudia 50</p>
@@ -138,7 +113,6 @@ export default function Stampa() {
         <p className="text-right font-semibold mt-6 mb-4">
           PREVENTIVO Nr. {quote.quote_number} del {format(dataPrev, 'dd/MM/yyyy')}
         </p>
-
         <div className="border-t border-neutral-300" />
 
         <div className="text-right mt-8 mb-8 leading-5">
@@ -159,9 +133,10 @@ export default function Stampa() {
             <tr className="border-y border-neutral-400 text-[10px]">
               <th className="text-left font-semibold py-2 pr-2">DESCRIZIONE</th>
               <th className="text-center font-semibold py-2 w-10">QTÀ</th>
-              <th className="text-right font-semibold py-2 w-28">PREZZO UNITARIO (€)</th>
-              <th className="text-right font-semibold py-2 w-24">TOTALE (€)</th>
-              <th className="text-center font-semibold py-2 w-14">IVA</th>
+              <th className="text-right font-semibold py-2 w-24">PREZZO UNITARIO (€)</th>
+              <th className="text-right font-semibold py-2 w-20">TOTALE (€)</th>
+              <th className="text-center font-semibold py-2 w-12">IVA</th>
+              <th className="text-center font-semibold py-2 w-16">COVER</th>
             </tr>
           </thead>
           <tbody>
@@ -170,11 +145,17 @@ export default function Stampa() {
               const tot = qty * Number(row.unit_price)
               return (
                 <tr key={row.id} className="border-b border-neutral-200 align-top">
-                  <td className="py-3 pr-3 leading-4">{row.name}</td>
+                  <td className="py-3 pr-3 leading-4">
+                    <span className="font-medium">{row.name}</span>
+                    {row.description && <div className="text-[10px] text-neutral-500 mt-1">{row.description}</div>}
+                  </td>
                   <td className="py-3 text-center">{qty}</td>
                   <td className="py-3 text-right">{Number(row.unit_price).toLocaleString('it-IT', { minimumFractionDigits: 2 })} €</td>
                   <td className="py-3 text-right">{tot.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €</td>
                   <td className="py-3 text-center">22.0 %</td>
+                  <td className="py-3 text-center">
+                    {row.image_url && <img src={row.image_url} alt="" className="h-12 w-12 object-contain mx-auto" />}
+                  </td>
                 </tr>
               )
             })}
@@ -184,19 +165,14 @@ export default function Stampa() {
         <div className="mt-10 border-t border-neutral-300 pt-6 flex justify-end">
           <div className="text-right">
             <p className="text-neutral-500 text-[11px]">Imponibile</p>
-            <p className="text-2xl font-semibold">
-              {imponibile.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €
-            </p>
+            <p className="text-2xl font-semibold">{imponibile.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €</p>
             <p className="text-neutral-500 text-[11px]">+ IVA</p>
           </div>
         </div>
 
         {quote.footer_notes && (
-          <div className="mt-10 text-[11px] leading-5 whitespace-pre-wrap uppercase">
-            {quote.footer_notes}
-          </div>
+          <div className="mt-10 text-[11px] leading-5 whitespace-pre-wrap uppercase">{quote.footer_notes}</div>
         )}
-
         <p className="mt-3 text-[11px] font-semibold uppercase">
           IL PRESENTE PREVENTIVO HA VALIDITA' FINO AL {format(validita, 'dd MMMM yyyy', { locale: it }).toUpperCase()}
         </p>
@@ -211,18 +187,6 @@ export default function Stampa() {
             <p>Nps - Nuovo Punto Sicurezza snc</p>
           </div>
         </div>
-
-        <footer className="mt-16 pt-4 flex justify-between items-end text-[10px] text-neutral-500">
-          <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="" className="h-8 w-8 object-contain" />
-            <div>
-              <p className="font-semibold text-neutral-700">Nuovo Punto Sicurezza Snc</p>
-              <p>www.nuovopuntosicurezza.com · nuovopuntosicurezza@gmail.com</p>
-              <p>Tel: 338637982018</p>
-            </div>
-          </div>
-          <p>PREVENTIVO Nr. {quote.quote_number}</p>
-        </footer>
       </article>
     </div>
   )

@@ -22,6 +22,7 @@ export interface Material {
   description: string | null
   unit: string | null
   unit_price: number
+  image_url?: string | null
 }
 
 export interface Quote {
@@ -30,6 +31,8 @@ export interface Quote {
   quote_number: string | null
   client_id: string | null
   notes: string | null
+  oggetto?: string | null
+  footer_notes?: string | null
   status: string | null
 }
 
@@ -42,4 +45,7 @@ export interface QuoteItem {
   quantity: number
   unit: string | null
   unit_price: number
+  description?: string | null
+  image_url?: string | null
+  is_discount?: boolean
 }
