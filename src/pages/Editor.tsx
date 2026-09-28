@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import type { Client, Category, Material, QuoteItem } from '../types'
+import type { Client, Material, QuoteItem } from '../types'
 
 const NOTE_DEFAULT = `NUOVO PUNTO SICUREZZA SNC E' CERTIFICATA AJAX SU LINEA BASIC SUPERIOR E FIBRA.
 LA GARANZIA COPRE TUTTI I PRODOTTI PER 24 MESI E SARA' GESTITA DIRETTAMENTE DA NOI.`
@@ -13,24 +13,23 @@ export default function Editor() {
 
   const [quoteId, setQuoteId] = useState<string | null>(id || null)
   const [clients, setClients] = useState<Client[]>([])
-  const [categories, setCategories] = useState<Category[]>([])
   const [materials, setMaterials] = useState<Material[]>([])
   const [items, setItems] = useState<QuoteItem[]>([])
   const [clientId, setClientId] = useState(clienteFromUrl || '')
-  const [search, setSearch] = useState('')
+  const [searchClient, setSearchClient] = useState('')
+  const [searchProd, setSearchProd] = useState('')
   const [oggetto, setOggetto] = useState('')
   const [footerNotes, setFooterNotes] = useState(NOTE_DEFAULT)
   const [quoteNumber, setQuoteNumber] = useState('')
   const [sconto, setSconto] = useState('')
+  const [newClient, setNewClient] = useState({ name: '', phone: '', email: '', address: '', city: '' })
 
   useEffect(() => { start() }, [])
 
   async function start() {
     const { data: cl } = await supabase.from('clients').select('*').order('name')
-    const { data: cat } = await supabase.from('categories').select('*').order('name')
     const { data: mat } = await supabase.from('materials').select('*').order('name')
     setClients(cl || [])
-    setCategories(cat || [])
     setMaterials(mat || [])
 
     if (id) {
@@ -74,12 +73,29 @@ export default function Editor() {
     else alert('Salvato')
   }
 
-  async function addMaterial(m: Material, catName: string) {
+  async function addCliente(e: React.FormEvent) {
+    e.preventDefault()
+    if (!newClient.name.trim()) return alert('Inserisci il nome')
+    const { data, error } = await supabase.from('clients').insert({
+      name: newClient.name.trim(),
+      phone: newClient.phone || null,
+      email: newClient.email || null,
+      address: newClient.address || null,
+      city: newClient.city || null,
+    }).select().single()
+    if (error) return alert(error.message)
+    setClients(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)))
+    setClientId(data.id)
+    setNewClient({ name: '', phone: '', email: '', address: '', city: '' })
+    alert('Cliente salvato in Anagrafica')
+  }
+
+  async function addMaterial(m: Material) {
     if (!quoteId) return
-    const { data } = await supabase.from('quote_items').insert({
+    const { data, error } = await supabase.from('quote_items').insert({
       quote_id: quoteId,
       material_id: m.id,
-      category_name: catName,
+      category_name: null,
       name: m.name,
       description: m.description,
       image_url: m.image_url,
@@ -88,6 +104,23 @@ export default function Editor() {
       unit_price: m.unit_price,
       is_discount: false,
     }).select().single()
+    if (error) return alert(error.message)
+    if (data) setItems(prev => [...prev, data])
+    setSearchProd('')
+  }
+
+  async function addRigaLibera() {
+    if (!quoteId) return
+    const { data, error } = await supabase.from('quote_items').insert({
+      quote_id: quoteId,
+      name: 'Nuova riga',
+      description: '',
+      quantity: 1,
+      unit: 'pz',
+      unit_price: 0,
+      is_discount: false,
+    }).select().single()
+    if (error) return alert(error.message)
     if (data) setItems(prev => [...prev, data])
   }
 
@@ -109,8 +142,18 @@ export default function Editor() {
   }
 
   async function updateItem(idItem: string, patch: Partial<QuoteItem>) {
-    await supabase.from('quote_items').update(patch).eq('id', idItem)
+    const { error } = await supabase.from('quote_items').update(patch).eq('id', idItem)
+    if (error) return alert(error.message)
     setItems(prev => prev.map(i => i.id === idItem ? { ...i, ...patch } : i))
+  }
+
+  async function uploadFoto(itemId: string, file: File) {
+    const ext = file.name.split('.').pop()
+    const pathName = `righe/${Date.now()}.${ext}`
+    const { error } = await supabase.storage.from('prodotti').upload(pathName, file)
+    if (error) return alert('Foto non caricata: ' + error.message)
+    const { data } = supabase.storage.from('prodotti').getPublicUrl(pathName)
+    updateItem(itemId, { image_url: data.publicUrl })
   }
 
   async function removeItem(itemId: string) {
@@ -118,8 +161,16 @@ export default function Editor() {
     setItems(prev => prev.filter(i => i.id !== itemId))
   }
 
-  const filteredClients = clients.filter(c => c.name.toLowerCase().includes(search.toLowerCase()))
+  const filteredClients = clients.filter(c =>
+    c.name.toLowerCase().includes(searchClient.toLowerCase())
+  )
   const selectedClient = clients.find(c => c.id === clientId)
+  const foundProducts = searchProd.trim().length >= 2
+    ? materials.filter(m =>
+        m.name.toLowerCase().includes(searchProd.toLowerCase()) ||
+        (m.description || '').toLowerCase().includes(searchProd.toLowerCase())
+      ).slice(0, 8)
+    : []
   const total = items.reduce((sum, i) => sum + Math.round(Number(i.quantity)) * Number(i.unit_price), 0)
 
   return (
@@ -136,84 +187,143 @@ export default function Editor() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow p-4 space-y-3">
-        <h2 className="font-semibold">Cliente da Anagrafica</h2>
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Cerca cliente..." className="w-full border rounded-lg px-3 py-2" />
-        <div className="max-h-40 overflow-auto border rounded-lg">
+      <div className="bg-white rounded-xl shadow p-4 space-y-4">
+        <h2 className="font-semibold">Cliente</h2>
+        <input
+          value={searchClient}
+          onChange={e => setSearchClient(e.target.value)}
+          placeholder="Cerca in anagrafica..."
+          className="w-full border rounded-lg px-3 py-2"
+        />
+        <div className="max-h-32 overflow-auto border rounded-lg">
           {filteredClients.map(c => (
-            <button key={c.id} onClick={() => setClientId(c.id)} className={`block w-full text-left px-3 py-2 text-sm ${clientId === c.id ? 'bg-blue-50 font-medium' : 'hover:bg-slate-50'}`}>
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => setClientId(c.id)}
+              className={`block w-full text-left px-3 py-2 text-sm ${clientId === c.id ? 'bg-blue-50 font-medium' : 'hover:bg-slate-50'}`}
+            >
               {c.name} {c.city ? `· ${c.city}` : ''}
             </button>
           ))}
         </div>
-        {selectedClient && <p className="text-sm">Selezionato: <strong>{selectedClient.name}</strong></p>}
+        {selectedClient && (
+          <p className="text-sm text-green-700">Cliente selezionato: <strong>{selectedClient.name}</strong></p>
+        )}
 
-        <label className="block text-sm font-medium">Oggetto</label>
-        <textarea value={oggetto} onChange={e => setOggetto(e.target.value)} className="w-full border rounded-lg px-3 py-2" rows={2} />
-
-        <label className="block text-sm font-medium">Note in fondo</label>
-        <textarea value={footerNotes} onChange={e => setFooterNotes(e.target.value)} className="w-full border rounded-lg px-3 py-2" rows={5} />
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="space-y-4">
-          <h2 className="font-semibold">Aggiungi materiali</h2>
-          {categories.map(cat => (
-            <div key={cat.id} className="bg-white rounded-xl shadow p-4">
-              <h3 className="text-sm font-semibold mb-2">{cat.name}</h3>
-              {materials.filter(m => m.category_id === cat.id).map(m => (
-                <button key={m.id} onClick={() => addMaterial(m, cat.name)} className="flex justify-between w-full text-sm py-1 hover:text-blue-600 text-left">
-                  <span>{m.name}</span>
-                  <span>€ {Number(m.unit_price).toFixed(2)}</span>
-                </button>
-              ))}
-            </div>
-          ))}
-          <form onSubmit={addSconto} className="bg-white rounded-xl shadow p-4 flex gap-2">
-            <input type="number" step="0.01" value={sconto} onChange={e => setSconto(e.target.value)} placeholder="Importo sconto €" className="flex-1 border rounded-lg px-3 py-2" />
-            <button className="bg-amber-500 text-white px-4 rounded-lg">Aggiungi sconto</button>
+        <div className="border-t pt-3">
+          <p className="font-medium mb-2">Il cliente non c’è? Crealo qui (si salva in Anagrafica)</p>
+          <form onSubmit={addCliente} className="grid md:grid-cols-5 gap-2">
+            <input value={newClient.name} onChange={e => setNewClient(p => ({ ...p, name: e.target.value }))} placeholder="Nome *" className="border rounded-lg px-2 py-2" />
+            <input value={newClient.phone} onChange={e => setNewClient(p => ({ ...p, phone: e.target.value }))} placeholder="Telefono" className="border rounded-lg px-2 py-2" />
+            <input value={newClient.email} onChange={e => setNewClient(p => ({ ...p, email: e.target.value }))} placeholder="Email" className="border rounded-lg px-2 py-2" />
+            <input value={newClient.city} onChange={e => setNewClient(p => ({ ...p, city: e.target.value }))} placeholder="Città" className="border rounded-lg px-2 py-2" />
+            <button className="bg-blue-600 text-white rounded-lg">Salva cliente</button>
           </form>
         </div>
 
-        <div className="bg-white rounded-xl shadow p-4 space-y-3">
-          <h2 className="font-semibold">Righe preventivo</h2>
-          {items.length === 0 && <p className="text-slate-400 text-sm">Nessun materiale</p>}
-          {items.map(item => (
-            <div key={item.id} className="border-b pb-3 text-sm space-y-2">
-              <div className="flex gap-2 items-start">
-                {item.image_url && <img src={item.image_url} alt="" className="h-12 w-12 object-contain" />}
-                <div className="flex-1">
-                  <p className="font-medium">{item.name}</p>
-                  <input
-                    value={item.description || ''}
-                    onChange={e => updateItem(item.id, { description: e.target.value })}
-                    placeholder="Descrizione riga"
-                    className="w-full border rounded px-2 py-1 mt-1"
-                  />
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {!item.is_discount && (
-                  <div className="flex items-center gap-1">
-                    <button type="button" onClick={() => updateItem(item.id, { quantity: Math.max(1, Math.round(Number(item.quantity)) - 1) })} className="w-7 h-7 border rounded">−</button>
-                    <span className="w-8 text-center">{Math.round(Number(item.quantity))}</span>
-                    <button type="button" onClick={() => updateItem(item.id, { quantity: Math.round(Number(item.quantity)) + 1 })} className="w-7 h-7 border rounded">+</button>
-                  </div>
-                )}
+        <label className="block text-sm font-medium">Oggetto</label>
+        <textarea value={oggetto} onChange={e => setOggetto(e.target.value)} className="w-full border rounded-lg px-3 py-2" rows={2} />
+        <label className="block text-sm font-medium">Note in fondo</label>
+        <textarea value={footerNotes} onChange={e => setFooterNotes(e.target.value)} className="w-full border rounded-lg px-3 py-2" rows={4} />
+      </div>
+
+      <div className="bg-white rounded-xl shadow p-4 space-y-3">
+        <h2 className="font-semibold">Aggiungi una riga</h2>
+        <input
+          value={searchProd}
+          onChange={e => setSearchProd(e.target.value)}
+          placeholder="Cerca prodotto nel catalogo (almeno 2 lettere)..."
+          className="w-full border rounded-lg px-3 py-2"
+        />
+        {foundProducts.length > 0 && (
+          <div className="border rounded-lg divide-y">
+            {foundProducts.map(m => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => addMaterial(m)}
+                className="flex justify-between w-full px-3 py-2 text-sm hover:bg-blue-50 text-left"
+              >
+                <span>
+                  {m.name}
+                  {m.description ? <span className="block text-xs text-slate-500">{m.description}</span> : null}
+                </span>
+                <span>€ {Number(m.unit_price).toFixed(2)}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={addRigaLibera} className="border px-4 py-2 rounded-lg text-sm">
+            + Riga libera
+          </button>
+          <form onSubmit={addSconto} className="flex gap-2">
+            <input type="number" step="0.01" value={sconto} onChange={e => setSconto(e.target.value)} placeholder="Sconto €" className="border rounded-lg px-3 py-2 w-32" />
+            <button className="bg-amber-500 text-white px-4 rounded-lg text-sm">Aggiungi sconto</button>
+          </form>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl shadow p-4 space-y-4">
+        <h2 className="font-semibold">Righe del preventivo</h2>
+        {items.length === 0 && <p className="text-slate-400 text-sm">Nessuna riga. Cerca un prodotto oppure aggiungi una riga libera.</p>}
+        {items.map((item, idx) => (
+          <div key={item.id} className="border rounded-xl p-3 space-y-2">
+            <div className="flex justify-between text-xs text-slate-500">
+              <span>Riga {idx + 1}</span>
+              <button type="button" onClick={() => removeItem(item.id)} className="text-red-600">Elimina riga</button>
+            </div>
+            <div className="flex gap-3 items-start">
+              {item.image_url
+                ? <img src={item.image_url} alt="" className="h-16 w-16 object-contain border rounded" />
+                : <div className="h-16 w-16 border rounded bg-slate-50" />}
+              <div className="flex-1 space-y-2">
                 <input
-                  type="number"
-                  step="0.01"
-                  value={item.unit_price}
-                  onChange={e => updateItem(item.id, { unit_price: Number(e.target.value) })}
-                  className="w-24 border rounded px-2 py-1"
+                  value={item.name}
+                  onChange={e => updateItem(item.id, { name: e.target.value })}
+                  className="w-full border rounded-lg px-3 py-2 font-medium"
                 />
-                <span className="ml-auto">€ {(Math.round(Number(item.quantity)) * Number(item.unit_price)).toFixed(2)}</span>
-                <button onClick={() => removeItem(item.id)} className="text-red-600">x</button>
+                <textarea
+                  value={item.description || ''}
+                  onChange={e => updateItem(item.id, { description: e.target.value })}
+                  placeholder="Descrizione prodotto"
+                  className="w-full border rounded-lg px-3 py-2"
+                  rows={2}
+                />
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={e => {
+                    const file = e.target.files?.[0]
+                    if (file) uploadFoto(item.id, file)
+                  }}
+                />
               </div>
             </div>
-          ))}
-          <p className="text-right font-bold">Imponibile € {total.toFixed(2)}</p>
-        </div>
+            <div className="flex items-center gap-2">
+              {!item.is_discount && (
+                <>
+                  <button type="button" onClick={() => updateItem(item.id, { quantity: Math.max(1, Math.round(Number(item.quantity)) - 1) })} className="w-8 h-8 border rounded">−</button>
+                  <span className="w-8 text-center">{Math.round(Number(item.quantity))}</span>
+                  <button type="button" onClick={() => updateItem(item.id, { quantity: Math.round(Number(item.quantity)) + 1 })} className="w-8 h-8 border rounded">+</button>
+                </>
+              )}
+              <span className="text-sm">Prezzo €</span>
+              <input
+                type="number"
+                step="0.01"
+                value={item.unit_price}
+                onChange={e => updateItem(item.id, { unit_price: Number(e.target.value) })}
+                className="w-28 border rounded-lg px-2 py-1"
+              />
+              <span className="ml-auto font-medium">
+                € {(Math.round(Number(item.quantity)) * Number(item.unit_price)).toFixed(2)}
+              </span>
+            </div>
+          </div>
+        ))}
+        <p className="text-right text-xl font-bold">Imponibile € {total.toFixed(2)}</p>
       </div>
     </div>
   )
