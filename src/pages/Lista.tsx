@@ -50,7 +50,15 @@ export default function Lista() {
   }
 
   async function duplica(q: any) {
-    const num = String(Date.now()).slice(-5) + '/' + new Date().getFullYear()
+    const year = new Date().getFullYear()
+const { data: existing } = await supabase.from('quotes').select('quote_number')
+const usati = (existing || []).map(q => {
+  const m = String(q.quote_number || '').match(/^(\d+)\/(\d{4})$/)
+  if (m && Number(m[2]) === year) return Number(m[1])
+  return 0
+})
+const prossimo = Math.max(0, ...usati) + 1
+const num = `${prossimo}/${year}`
     const { data: nuovo, error } = await supabase
       .from('quotes')
       .insert({
