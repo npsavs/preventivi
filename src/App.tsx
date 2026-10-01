@@ -3,12 +3,14 @@ import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabase'
 import Login from './pages/Login'
 import Layout from './components/Layout'
+import Home from './pages/Home'
 import Lista from './pages/Lista'
 import Catalogo from './pages/Catalogo'
 import Editor from './pages/Editor'
 import Stampa from './pages/Stampa'
+import Clienti from './pages/Clienti'
 
-function App() {
+export default function App() {
   const [session, setSession] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
@@ -30,8 +32,10 @@ function App() {
       <Routes>
         <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
         <Route path="/" element={session ? <Layout /> : <Navigate to="/login" />}>
-          <Route index element={<Lista />} />
+          <Route index element={<Home />} />
+          <Route path="lista" element={<Lista />} />
           <Route path="catalogo" element={<Catalogo />} />
+          <Route path="clienti" element={<Clienti />} />
           <Route path="nuovo" element={<Editor />} />
           <Route path="preventivo/:id" element={<Editor />} />
           <Route path="stampa/:id" element={<Stampa />} />
@@ -40,5 +44,3 @@ function App() {
     </BrowserRouter>
   )
 }
-
-export default App

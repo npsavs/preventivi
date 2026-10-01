@@ -1,27 +1,27 @@
-import { Outlet, Link, useNavigate } from 'react-router-dom'
+import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+
+const item = ({ isActive }: { isActive: boolean }) =>
+  'px-2 py-1 rounded ' + (isActive ? 'bg-white/15 font-semibold' : 'text-slate-300')
 
 export default function Layout() {
   const navigate = useNavigate()
 
   return (
     <div className="min-h-screen bg-slate-100">
-      <header className="no-print bg-slate-900 text-white px-6 py-4 flex justify-between items-center">
-        <Link to="/" className="font-bold text-lg">Preventivi</Link>
-        <nav className="flex gap-4 text-sm">
-          <Link to="/" className="hover:underline">Lista</Link>
-          <Link to="/catalogo" className="hover:underline">Materiali</Link>
-          <button
-            onClick={async () => {
-              await supabase.auth.signOut()
-              navigate('/login')
-            }}
-          >
-            Esci
-          </button>
-        </nav>
+      <header className="no-print text-white px-4 py-3" style={{ background: '#0f1a3d' }}>
+        <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
+          <nav className="flex flex-wrap gap-3 text-sm">
+            <NavLink to="/" end className={item}>Panoramica</NavLink>
+            <NavLink to="/lista" className={item}>Preventivi</NavLink>
+            <NavLink to="/clienti" className={item}>Clienti</NavLink>
+            <NavLink to="/catalogo" className={item}>Materiali</NavLink>
+            <NavLink to="/nuovo" className={item}>+ Nuovo</NavLink>
+          </nav>
+          <button type="button" onClick={async () => { await supabase.auth.signOut(); navigate('/login') }} className="text-sm text-slate-300">Esci</button>
+        </div>
       </header>
-      <main className="max-w-5xl mx-auto p-6">
+      <main className="max-w-6xl mx-auto p-4">
         <Outlet />
       </main>
     </div>
