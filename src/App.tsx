@@ -1,3 +1,4 @@
+import MaterialeForm from './pages/MaterialeForm'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabase'
@@ -39,6 +40,8 @@ export default function App() {
           <Route path="nuovo" element={<Editor />} />
           <Route path="preventivo/:id" element={<Editor />} />
           <Route path="stampa/:id" element={<Stampa />} />
+          <Route path="materiale/nuovo" element={<MaterialeForm />} />
+          <Route path="materiale/:id" element={<MaterialeForm />} />
         </Route>
       </Routes>
     </BrowserRouter>
