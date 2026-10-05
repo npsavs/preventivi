@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { format, parseISO } from 'date-fns'
 import { it } from 'date-fns/locale'
@@ -26,20 +26,25 @@ function annoDi(r: any) {
   return String(r.created_at || '').slice(0, 4)
 }
 
+function trimestreDi(r: any) {
+  const d = new Date(r.created_at)
+  return Math.floor(d.getMonth() / 3) + 1
+}
+
 export default function Lista() {
-  const navigate = useNavigate()
   const [quotes, setQuotes] = useState<any[]>([])
   const [itemsAll, setItemsAll] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
   const [filtro, setFiltro] = useState('tutti')
   const [filtroAnno, setFiltroAnno] = useState(String(new Date().getFullYear()))
+  const [trim, setTrim] = useState(Math.floor(new Date().getMonth() / 3) + 1)
 
   useEffect(() => { load() }, [])
 
   async function load() {
     const { data } = await supabase.from('quotes').select('*, clients(name)').order('created_at', { ascending: false })
-    const { data: it } = await supabase.from('quote_items').select('quote_id, quantity, unit_price')
+    const { data: it } = await supabase.from('quote_items').select('quote_id, quantity, unit_price, name, description')
     setQuotes(data || [])
     setItemsAll(it || [])
     setLoading(false)
@@ -77,10 +82,9 @@ export default function Lista() {
       invoice_date: format(new Date(), 'yyyy-MM-dd'),
     }).select().single()
     if (inv.error || !inv.data) return alert(inv.error?.message || 'Fattura non creata')
-    const righe = itemsAll.filter(i => i.quote_id === row.id)
-    if (righe.length) {
-      const { data: dettagli } = await supabase.from('quote_items').select('*').eq('quote_id', row.id)
-      await supabase.from('invoice_items').insert((dettagli || []).map(i => ({
+    const { data: dettagli } = await supabase.from('quote_items').select('*').eq('quote_id', row.id)
+    if (dettagli && dettagli.length) {
+      await supabase.from('invoice_items').insert(dettagli.map(i => ({
         invoice_id: inv.data.id,
         name: i.name,
         description: i.description,
@@ -93,6 +97,7 @@ export default function Lista() {
   }
 
   const cerca = q.trim().toLowerCase()
+  const annoCorrente = String(new Date().getFullYear())
   const filtered = quotes.filter(row => {
     if (cerca && !(String(row.quote_number || '').toLowerCase().includes(cerca) || String(row.clients?.name || '').toLowerCase().includes(cerca))) return false
     if (filtroAnno && annoDi(row) !== filtroAnno) return false
@@ -106,14 +111,15 @@ export default function Lista() {
       const imponibile = itemsAll.filter(i => ids.has(i.quote_id)).reduce((s, i) => s + Number(i.quantity) * Number(i.unit_price), 0)
       return { imponibile, iva: imponibile * 0.22, totale: imponibile * 1.22, n: lista.length }
     }
-    const anno = String(new Date().getFullYear())
-    const base = quotes.filter(r => !cerca || String(r.quote_number || '').toLowerCase().includes(cerca) || String(r.clients?.name || '').toLowerCase().includes(cerca))
     return {
-      corrente: conto(base.filter(r => annoDi(r) === anno)),
-      scelto: conto(filtroAnno ? base.filter(r => annoDi(r) === filtroAnno) : base),
+      anno: conto(quotes.filter(r => annoDi(r) === annoCorrente)),
+      trim: conto(quotes.filter(r => annoDi(r) === annoCorrente && trimestreDi(r) === trim)),
+      filtro: conto(filtered),
+      filtroTrim: conto(filtered.filter(r => trimestreDi(r) === trim)),
     }
-  }, [quotes, itemsAll, filtroAnno, cerca])
+  }, [quotes, itemsAll, filtered, trim])
 
+  const nomeFiltro = STATI.find(s => s.value === filtro)?.label || 'Tutti'
   if (loading) return <div className="text-center py-10">Caricamento...</div>
 
   return (
@@ -122,18 +128,6 @@ export default function Lista() {
         <h1 className="text-2xl font-bold">Preventivi</h1>
         <Link to="/nuovo" className="bg-slate-900 text-white px-4 py-2 rounded-lg">+ Nuovo preventivo</Link>
       </div>
-      <div className="grid md:grid-cols-2 gap-3">
-        <div className="bg-white rounded-xl shadow p-4">
-          <p className="text-xs text-slate-500">Preventivi {new Date().getFullYear()} · {cerca || 'tutti'} · {stats.corrente.n}</p>
-          <p className="text-xl font-bold">EUR {stats.corrente.totale.toFixed(2)}</p>
-          <p className="text-sm text-slate-500">Imponibile {stats.corrente.imponibile.toFixed(2)} · IVA {stats.corrente.iva.toFixed(2)}</p>
-        </div>
-        <div className="bg-white rounded-xl shadow p-4">
-          <p className="text-xs text-slate-500">Preventivi {filtroAnno || 'tutti gli anni'} · {cerca || 'tutti'} · {stats.scelto.n}</p>
-          <p className="text-xl font-bold">EUR {stats.scelto.totale.toFixed(2)}</p>
-          <p className="text-sm text-slate-500">Imponibile {stats.scelto.imponibile.toFixed(2)} · IVA {stats.scelto.iva.toFixed(2)}</p>
-        </div>
-      </div>
       <div className="flex flex-wrap gap-2 bg-white p-3 rounded-xl shadow">
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Cerca cliente o numero..." className="border rounded-lg px-3 py-2 text-sm flex-1 min-w-[160px]" />
         <select value={filtroAnno} onChange={e => setFiltroAnno(e.target.value)} className="border rounded-lg px-2 py-2 text-sm">
@@ -141,10 +135,35 @@ export default function Lista() {
           <option value="2026">2026</option>
           <option value="2025">2025</option>
         </select>
+        {[1, 2, 3, 4].map(t => (
+          <button key={t} type="button" onClick={() => setTrim(t)} className={'px-3 py-2 rounded-lg text-sm ' + (trim === t ? 'bg-blue-700 text-white' : 'border')}>T{t}</button>
+        ))}
         <button type="button" onClick={() => setFiltro('tutti')} className={'px-3 py-2 rounded-lg text-sm ' + (filtro === 'tutti' ? 'bg-slate-900 text-white' : 'border')}>Tutti</button>
         {STATI.map(s => (
           <button key={s.value} type="button" onClick={() => setFiltro(s.value)} className={'px-3 py-2 rounded-lg text-sm ' + (filtro === s.value ? 'bg-slate-900 text-white' : 'border')}>{s.label}</button>
         ))}
+      </div>
+      <div className="grid md:grid-cols-2 gap-3">
+        <div className="bg-white rounded-xl shadow p-4">
+          <p className="text-xs text-slate-500">Totale preventivi {annoCorrente}</p>
+          <p className="text-xl font-bold">EUR {stats.anno.totale.toFixed(2)}</p>
+          <p className="text-sm text-slate-500">Imponibile {stats.anno.imponibile.toFixed(2)} · IVA {stats.anno.iva.toFixed(2)} · {stats.anno.n}</p>
+        </div>
+        <div className="bg-white rounded-xl shadow p-4">
+          <p className="text-xs text-slate-500">Trimestre T{trim} {annoCorrente}</p>
+          <p className="text-xl font-bold">EUR {stats.trim.totale.toFixed(2)}</p>
+          <p className="text-sm text-slate-500">Imponibile {stats.trim.imponibile.toFixed(2)} · IVA {stats.trim.iva.toFixed(2)} · {stats.trim.n}</p>
+        </div>
+        <div className="bg-white rounded-xl shadow p-4">
+          <p className="text-xs text-slate-500">Filtro · {nomeFiltro} · {cerca || 'tutti'} · {filtroAnno || 'tutti gli anni'}</p>
+          <p className="text-xl font-bold">EUR {stats.filtro.totale.toFixed(2)}</p>
+          <p className="text-sm text-slate-500">Imponibile {stats.filtro.imponibile.toFixed(2)} · IVA {stats.filtro.iva.toFixed(2)} · {stats.filtro.n}</p>
+        </div>
+        <div className="bg-white rounded-xl shadow p-4">
+          <p className="text-xs text-slate-500">Filtro T{trim} · {nomeFiltro} · {cerca || 'tutti'}</p>
+          <p className="text-xl font-bold">EUR {stats.filtroTrim.totale.toFixed(2)}</p>
+          <p className="text-sm text-slate-500">Imponibile {stats.filtroTrim.imponibile.toFixed(2)} · IVA {stats.filtroTrim.iva.toFixed(2)} · {stats.filtroTrim.n}</p>
+        </div>
       </div>
       <div className="bg-white rounded-xl shadow divide-y">
         {filtered.length === 0 ? <p className="p-6 text-center text-slate-500">Nessun preventivo</p> : null}
