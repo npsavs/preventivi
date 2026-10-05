@@ -14,7 +14,7 @@ async function prossimoNumero() {
     if (m && Number(m[2]) === year) return Number(m[1])
     return 0
   })
-  return `${Math.max(0, ...usati) + 1}/${year}`
+  return (Math.max(0, ...usati) + 1) + '/' + year
 }
 
 export default function Editor() {
@@ -33,9 +33,50 @@ export default function Editor() {
   const [footerNotes, setFooterNotes] = useState(NOTE_DEFAULT)
   const [quoteNumber, setQuoteNumber] = useState('')
   const [sconto, setSconto] = useState('')
+  const [dirty, setDirty] = useState(true)
   const [newClient, setNewClient] = useState({ name: '', phone: '', email: '', address: '', city: '' })
 
   useEffect(() => { start() }, [])
+
+  useEffect(() => {
+    async function onClick(e: MouseEvent) {
+      if (!dirty) return
+      const a = (e.target as HTMLElement).closest('a')
+      if (!a) return
+      if ((a.getAttribute('href') || '').indexOf('/stampa/') >= 0) return
+      e.preventDefault()
+      e.stopPropagation()
+      if (!clientId) {
+        if (!confirm('Senza cliente non si puo salvare. Eliminare il preventivo?')) return
+        if (quoteId) {
+          await supabase.from('quote_items').delete().eq('quote_id', quoteId)
+          await supabase.from('quotes').delete().eq('id', quoteId)
+        }
+        setDirty(false)
+        window.location.href = a.href
+        return
+      }
+      const salva = confirm('Salvare il preventivo prima di uscire?\nOK = salva\nAnnulla = elimina')
+      if (salva) {
+        await supabase.from('quotes').update({
+          client_id: clientId,
+          notes: oggetto,
+          oggetto,
+          footer_notes: footerNotes,
+          quote_number: quoteNumber,
+        }).eq('id', quoteId)
+      } else if (confirm('Eliminare questo preventivo?')) {
+        if (quoteId) {
+          await supabase.from('quote_items').delete().eq('quote_id', quoteId)
+          await supabase.from('quotes').delete().eq('id', quoteId)
+        }
+      } else return
+      setDirty(false)
+      window.location.href = a.href
+    }
+    document.addEventListener('click', onClick, true)
+    return () => document.removeEventListener('click', onClick, true)
+  }, [dirty, clientId, quoteId, oggetto, footerNotes, quoteNumber])
 
   async function start() {
     const { data: cl } = await supabase.from('clients').select('*').order('name')
@@ -66,22 +107,27 @@ export default function Editor() {
         setQuoteId(q.id)
         setQuoteNumber(num)
         if (clienteFromUrl) setClientId(clienteFromUrl)
-        navigate(`/preventivo/${q.id}`, { replace: true })
+        setDirty(true)
+        navigate('/preventivo/' + q.id, { replace: true })
       }
     }
   }
 
   async function saveHeader() {
     if (!quoteId) return
+    if (!clientId) return alert('Seleziona il cliente in anagrafica prima di salvare')
     const { error } = await supabase.from('quotes').update({
-      client_id: clientId || null,
+      client_id: clientId,
       notes: oggetto,
       oggetto,
       footer_notes: footerNotes,
       quote_number: quoteNumber,
     }).eq('id', quoteId)
     if (error) alert('Errore: ' + error.message)
-    else alert('Salvato')
+    else {
+      setDirty(false)
+      alert('Salvato')
+    }
   }
 
   async function addCliente(e: React.FormEvent) {
@@ -93,10 +139,12 @@ export default function Editor() {
       email: newClient.email || null,
       address: newClient.address || null,
       city: newClient.city || null,
+      kind: 'cliente',
     }).select().single()
     if (error) return alert(error.message)
     setClients(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)))
     setClientId(data.id)
+    setDirty(true)
     setNewClient({ name: '', phone: '', email: '', address: '', city: '' })
     alert('Cliente salvato in Anagrafica')
   }
@@ -118,6 +166,7 @@ export default function Editor() {
     if (error) return alert(error.message)
     if (data) setItems(prev => [...prev, data])
     setSearchProd('')
+    setDirty(true)
   }
 
   async function addRigaLibera() {
@@ -133,6 +182,7 @@ export default function Editor() {
     }).select().single()
     if (error) return alert(error.message)
     if (data) setItems(prev => [...prev, data])
+    setDirty(true)
   }
 
   async function addSconto(e: React.FormEvent) {
@@ -150,9 +200,11 @@ export default function Editor() {
     }).select().single()
     if (data) setItems(prev => [...prev, data])
     setSconto('')
+    setDirty(true)
   }
 
   async function updateItem(idItem: string, patch: Partial<QuoteItem>) {
+    setDirty(true)
     const { error } = await supabase.from('quote_items').update(patch).eq('id', idItem)
     if (error) return alert(error.message)
     setItems(prev => prev.map(i => i.id === idItem ? { ...i, ...patch } : i))
@@ -160,7 +212,7 @@ export default function Editor() {
 
   async function uploadFoto(itemId: string, file: File) {
     const ext = file.name.split('.').pop()
-    const pathName = `righe/${Date.now()}.${ext}`
+    const pathName = 'righe/' + Date.now() + '.' + ext
     const { error } = await supabase.storage.from('prodotti').upload(pathName, file)
     if (error) return alert('Foto non caricata: ' + error.message)
     const { data } = supabase.storage.from('prodotti').getPublicUrl(pathName)
@@ -168,13 +220,14 @@ export default function Editor() {
   }
 
   async function removeItem(itemId: string) {
+    setDirty(true)
     await supabase.from('quote_items').delete().eq('id', itemId)
     setItems(prev => prev.filter(i => i.id !== itemId))
   }
 
-  const filteredClients = clients.filter(c =>
-    c.name.toLowerCase().includes(searchClient.toLowerCase())
-  )
+  const filteredClients = searchClient.trim().length < 2
+    ? []
+    : clients.filter(c => c.name.toLowerCase().includes(searchClient.toLowerCase()))
   const selectedClient = clients.find(c => c.id === clientId)
   const foundProducts = searchProd.trim().length >= 2
     ? materials.filter(m =>
@@ -185,58 +238,52 @@ export default function Editor() {
   const total = items.reduce((sum, i) => sum + Math.round(Number(i.quantity)) * Number(i.unit_price), 0)
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">{quoteNumber || 'Nuovo preventivo'}</h1>
-        <div className="flex gap-2">
-          <button onClick={saveHeader} className="border px-4 py-2 rounded-lg">Salva</button>
-          {quoteId && (
-            <Link to={`/stampa/${quoteId}`} className="bg-slate-900 text-white px-4 py-2 rounded-lg">
-              Anteprima / Stampa
-            </Link>
-          )}
-        </div>
-      </div>
+    <div className="space-y-6 pb-8">
+      <h1 className="text-2xl font-bold">{quoteNumber || 'Nuovo preventivo'}</h1>
 
       <div className="bg-white rounded-xl shadow p-4 space-y-4">
         <h2 className="font-semibold">Cliente</h2>
+        {selectedClient ? (
+          <p className="text-sm text-green-700">Cliente selezionato: <strong>{selectedClient.name}</strong></p>
+        ) : (
+          <p className="text-sm text-red-700">Nessun cliente. Senza anagrafica non si puo salvare.</p>
+        )}
         <input
           value={searchClient}
           onChange={e => setSearchClient(e.target.value)}
-          placeholder="Cerca in anagrafica..."
+          placeholder="Scrivi almeno 2 lettere..."
           className="w-full border rounded-lg px-3 py-2"
         />
-        <div className="max-h-32 overflow-auto border rounded-lg">
-          {filteredClients.map(c => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => setClientId(c.id)}
-              className={`block w-full text-left px-3 py-2 text-sm ${clientId === c.id ? 'bg-blue-50 font-medium' : 'hover:bg-slate-50'}`}
-            >
-              {c.name} {c.city ? `· ${c.city}` : ''}
-            </button>
-          ))}
-        </div>
-        {selectedClient && (
-          <p className="text-sm text-green-700">Cliente selezionato: <strong>{selectedClient.name}</strong></p>
-        )}
+        {searchClient.trim().length >= 2 ? (
+          <div className="max-h-32 overflow-auto border rounded-lg">
+            {filteredClients.map(c => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => { setClientId(c.id); setDirty(true) }}
+                className={'block w-full text-left px-3 py-2 text-sm ' + (clientId === c.id ? 'bg-blue-50 font-medium' : '')}
+              >
+                {c.name} {c.city ? '· ' + c.city : ''}
+              </button>
+            ))}
+          </div>
+        ) : null}
 
         <div className="border-t pt-3">
-          <p className="font-medium mb-2">Il cliente non c’è? Crealo qui (si salva in Anagrafica)</p>
+          <p className="font-medium mb-2">Il cliente non c'e? Crealo qui</p>
           <form onSubmit={addCliente} className="grid md:grid-cols-5 gap-2">
             <input value={newClient.name} onChange={e => setNewClient(p => ({ ...p, name: e.target.value }))} placeholder="Nome *" className="border rounded-lg px-2 py-2" />
             <input value={newClient.phone} onChange={e => setNewClient(p => ({ ...p, phone: e.target.value }))} placeholder="Telefono" className="border rounded-lg px-2 py-2" />
             <input value={newClient.email} onChange={e => setNewClient(p => ({ ...p, email: e.target.value }))} placeholder="Email" className="border rounded-lg px-2 py-2" />
-            <input value={newClient.city} onChange={e => setNewClient(p => ({ ...p, city: e.target.value }))} placeholder="Città" className="border rounded-lg px-2 py-2" />
+            <input value={newClient.city} onChange={e => setNewClient(p => ({ ...p, city: e.target.value }))} placeholder="Citta" className="border rounded-lg px-2 py-2" />
             <button className="bg-blue-600 text-white rounded-lg">Salva cliente</button>
           </form>
         </div>
 
         <label className="block text-sm font-medium">Oggetto</label>
-        <textarea value={oggetto} onChange={e => setOggetto(e.target.value)} className="w-full border rounded-lg px-3 py-2" rows={2} />
+        <textarea value={oggetto} onChange={e => { setOggetto(e.target.value); setDirty(true) }} className="w-full border rounded-lg px-3 py-2" rows={2} />
         <label className="block text-sm font-medium">Note in fondo</label>
-        <textarea value={footerNotes} onChange={e => setFooterNotes(e.target.value)} className="w-full border rounded-lg px-3 py-2" rows={4} />
+        <textarea value={footerNotes} onChange={e => { setFooterNotes(e.target.value); setDirty(true) }} className="w-full border rounded-lg px-3 py-2" rows={4} />
       </div>
 
       <div className="bg-white rounded-xl shadow p-4 space-y-3">
@@ -244,10 +291,10 @@ export default function Editor() {
         <input
           value={searchProd}
           onChange={e => setSearchProd(e.target.value)}
-          placeholder="Cerca prodotto nel catalogo (almeno 2 lettere)..."
+          placeholder="Cerca prodotto (almeno 2 lettere)..."
           className="w-full border rounded-lg px-3 py-2"
         />
-        {foundProducts.length > 0 && (
+        {foundProducts.length > 0 ? (
           <div className="border rounded-lg divide-y">
             {foundProducts.map(m => (
               <button
@@ -260,17 +307,15 @@ export default function Editor() {
                   {m.name}
                   {m.description ? <span className="block text-xs text-slate-500">{m.description}</span> : null}
                 </span>
-                <span>€ {Number(m.unit_price).toFixed(2)}</span>
+                <span>EUR {Number(m.unit_price).toFixed(2)}</span>
               </button>
             ))}
           </div>
-        )}
+        ) : null}
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={addRigaLibera} className="border px-4 py-2 rounded-lg text-sm">
-            + Riga libera
-          </button>
+          <button type="button" onClick={addRigaLibera} className="border px-4 py-2 rounded-lg text-sm">+ Riga libera</button>
           <form onSubmit={addSconto} className="flex gap-2">
-            <input type="number" step="0.01" value={sconto} onChange={e => setSconto(e.target.value)} placeholder="Sconto €" className="border rounded-lg px-3 py-2 w-32" />
+            <input type="number" step="0.01" value={sconto} onChange={e => setSconto(e.target.value)} placeholder="Sconto EUR" className="border rounded-lg px-3 py-2 w-32" />
             <button className="bg-amber-500 text-white px-4 rounded-lg text-sm">Aggiungi sconto</button>
           </form>
         </div>
@@ -278,7 +323,7 @@ export default function Editor() {
 
       <div className="bg-white rounded-xl shadow p-4 space-y-4">
         <h2 className="font-semibold">Righe del preventivo</h2>
-        {items.length === 0 && <p className="text-slate-400 text-sm">Nessuna riga. Cerca un prodotto oppure aggiungi una riga libera.</p>}
+        {items.length === 0 ? <p className="text-slate-400 text-sm">Nessuna riga.</p> : null}
         {items.map((item, idx) => (
           <div key={item.id} className="border rounded-xl p-3 space-y-2">
             <div className="flex justify-between text-xs text-slate-500">
@@ -290,51 +335,31 @@ export default function Editor() {
                 ? <img src={item.image_url} alt="" className="h-16 w-16 object-contain border rounded" />
                 : <div className="h-16 w-16 border rounded bg-slate-50" />}
               <div className="flex-1 space-y-2">
-                <input
-                  value={item.name}
-                  onChange={e => updateItem(item.id, { name: e.target.value })}
-                  className="w-full border rounded-lg px-3 py-2 font-medium"
-                />
-                <textarea
-                  value={item.description || ''}
-                  onChange={e => updateItem(item.id, { description: e.target.value })}
-                  placeholder="Descrizione prodotto"
-                  className="w-full border rounded-lg px-3 py-2"
-                  rows={2}
-                />
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={e => {
-                    const file = e.target.files?.[0]
-                    if (file) uploadFoto(item.id, file)
-                  }}
-                />
+                <input value={item.name} onChange={e => updateItem(item.id, { name: e.target.value })} className="w-full border rounded-lg px-3 py-2 font-medium" />
+                <textarea value={item.description || ''} onChange={e => updateItem(item.id, { description: e.target.value })} placeholder="Descrizione prodotto" className="w-full border rounded-lg px-3 py-2" rows={2} />
+                <input type="file" accept="image/*" onChange={e => { const file = e.target.files && e.target.files[0]; if (file) uploadFoto(item.id, file) }} />
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {!item.is_discount && (
+              {!item.is_discount ? (
                 <>
-                  <button type="button" onClick={() => updateItem(item.id, { quantity: Math.max(1, Math.round(Number(item.quantity)) - 1) })} className="w-8 h-8 border rounded">−</button>
+                  <button type="button" onClick={() => updateItem(item.id, { quantity: Math.max(1, Math.round(Number(item.quantity)) - 1) })} className="w-8 h-8 border rounded">-</button>
                   <span className="w-8 text-center">{Math.round(Number(item.quantity))}</span>
                   <button type="button" onClick={() => updateItem(item.id, { quantity: Math.round(Number(item.quantity)) + 1 })} className="w-8 h-8 border rounded">+</button>
                 </>
-              )}
-              <span className="text-sm">Prezzo €</span>
-              <input
-                type="number"
-                step="0.01"
-                value={item.unit_price}
-                onChange={e => updateItem(item.id, { unit_price: Number(e.target.value) })}
-                className="w-28 border rounded-lg px-2 py-1"
-              />
-              <span className="ml-auto font-medium">
-                € {(Math.round(Number(item.quantity)) * Number(item.unit_price)).toFixed(2)}
-              </span>
+              ) : null}
+              <span className="text-sm">Prezzo EUR</span>
+              <input type="number" step="0.01" value={item.unit_price} onChange={e => updateItem(item.id, { unit_price: Number(e.target.value) })} className="w-28 border rounded-lg px-2 py-1" />
+              <span className="ml-auto font-medium">EUR {(Math.round(Number(item.quantity)) * Number(item.unit_price)).toFixed(2)}</span>
             </div>
           </div>
         ))}
-        <p className="text-right text-xl font-bold">Imponibile € {total.toFixed(2)}</p>
+        <p className="text-right text-xl font-bold">Imponibile EUR {total.toFixed(2)}</p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={saveHeader} className="border px-4 py-2 rounded-lg bg-white">Salva</button>
+        {quoteId ? <Link to={'/stampa/' + quoteId} className="bg-slate-900 text-white px-4 py-2 rounded-lg">Anteprima / Stampa</Link> : null}
       </div>
     </div>
   )

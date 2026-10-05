@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { format, parseISO } from 'date-fns'
@@ -22,9 +22,14 @@ function statoClass(v: string) {
   return 'bg-slate-100 text-slate-700'
 }
 
+function annoDi(r: any) {
+  return String(r.created_at || '').slice(0, 4)
+}
+
 export default function Lista() {
   const navigate = useNavigate()
   const [quotes, setQuotes] = useState<any[]>([])
+  const [itemsAll, setItemsAll] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
   const [filtro, setFiltro] = useState('tutti')
@@ -34,7 +39,9 @@ export default function Lista() {
 
   async function load() {
     const { data } = await supabase.from('quotes').select('*, clients(name)').order('created_at', { ascending: false })
+    const { data: it } = await supabase.from('quote_items').select('quote_id, quantity, unit_price')
     setQuotes(data || [])
+    setItemsAll(it || [])
     setLoading(false)
   }
 
@@ -50,49 +57,62 @@ export default function Lista() {
     load()
   }
 
-  async function duplica(row: any) {
+  async function creaFattura(row: any) {
+    if (!row.client_id) return alert('Manca il cliente in anagrafica')
+    if (!confirm('Creare una fattura dalle righe di ' + row.quote_number + '?')) return
     const year = new Date().getFullYear()
-    const { data: existing } = await supabase.from('quotes').select('quote_number')
-    const usati = (existing || []).map(x => {
-      const m = String(x.quote_number || '').match(/^(\d+)\/(\d{4})$/)
+    const { data: esistenti } = await supabase.from('invoices').select('invoice_number, invoice_type')
+    const usati = (esistenti || []).filter(x => (x.invoice_type || 'fattura') === 'fattura').map(x => {
+      const m = String(x.invoice_number || '').match(/^(\d+)\/(\d{4})$/)
       if (m && Number(m[2]) === year) return Number(m[1])
       return 0
     })
-    const num = (Math.max(0, ...usati) + 1) + '/' + year
-    const { data: nuovo, error } = await supabase.from('quotes').insert({
-      quote_number: num,
+    const numero = (Math.max(0, ...usati) + 1) + '/' + year
+    const inv = await supabase.from('invoices').insert({
+      invoice_number: numero,
       client_id: row.client_id,
-      notes: row.notes,
-      oggetto: row.oggetto,
-      footer_notes: row.footer_notes,
-      status: 'non_spedito',
+      invoice_type: 'fattura',
+      sdi_status: 'bozza',
+      oggetto: row.oggetto || ('Da preventivo ' + row.quote_number),
+      invoice_date: format(new Date(), 'yyyy-MM-dd'),
     }).select().single()
-    if (error || !nuovo) return alert(error?.message || 'Errore')
-    const { data: items } = await supabase.from('quote_items').select('*').eq('quote_id', row.id)
-    if (items && items.length) {
-      await supabase.from('quote_items').insert(items.map(i => ({
-        quote_id: nuovo.id,
-        material_id: i.material_id,
-        category_name: i.category_name,
+    if (inv.error || !inv.data) return alert(inv.error?.message || 'Fattura non creata')
+    const righe = itemsAll.filter(i => i.quote_id === row.id)
+    if (righe.length) {
+      const { data: dettagli } = await supabase.from('quote_items').select('*').eq('quote_id', row.id)
+      await supabase.from('invoice_items').insert((dettagli || []).map(i => ({
+        invoice_id: inv.data.id,
         name: i.name,
-        quantity: i.quantity,
-        unit: i.unit,
-        unit_price: i.unit_price,
         description: i.description,
-        image_url: i.image_url,
-        is_discount: i.is_discount,
+        quantity: i.quantity,
+        unit_price: i.unit_price,
+        vat_rate: 22,
       })))
     }
-    navigate('/preventivo/' + nuovo.id)
+    window.open('https://fatture-self.vercel.app/fattura/' + inv.data.id, '_blank')
   }
 
+  const cerca = q.trim().toLowerCase()
   const filtered = quotes.filter(row => {
-    const t = q.toLowerCase()
-    if (t && !(String(row.quote_number || '').toLowerCase().includes(t) || String(row.clients?.name || '').toLowerCase().includes(t))) return false
-    if (filtroAnno && String(row.created_at || '').slice(0, 4) !== filtroAnno) return false
+    if (cerca && !(String(row.quote_number || '').toLowerCase().includes(cerca) || String(row.clients?.name || '').toLowerCase().includes(cerca))) return false
+    if (filtroAnno && annoDi(row) !== filtroAnno) return false
     if (filtro !== 'tutti' && (row.status || 'non_spedito') !== filtro) return false
     return true
   })
+
+  const stats = useMemo(() => {
+    function conto(lista: any[]) {
+      const ids = new Set(lista.map(r => r.id))
+      const imponibile = itemsAll.filter(i => ids.has(i.quote_id)).reduce((s, i) => s + Number(i.quantity) * Number(i.unit_price), 0)
+      return { imponibile, iva: imponibile * 0.22, totale: imponibile * 1.22, n: lista.length }
+    }
+    const anno = String(new Date().getFullYear())
+    const base = quotes.filter(r => !cerca || String(r.quote_number || '').toLowerCase().includes(cerca) || String(r.clients?.name || '').toLowerCase().includes(cerca))
+    return {
+      corrente: conto(base.filter(r => annoDi(r) === anno)),
+      scelto: conto(filtroAnno ? base.filter(r => annoDi(r) === filtroAnno) : base),
+    }
+  }, [quotes, itemsAll, filtroAnno, cerca])
 
   if (loading) return <div className="text-center py-10">Caricamento...</div>
 
@@ -102,8 +122,20 @@ export default function Lista() {
         <h1 className="text-2xl font-bold">Preventivi</h1>
         <Link to="/nuovo" className="bg-slate-900 text-white px-4 py-2 rounded-lg">+ Nuovo preventivo</Link>
       </div>
+      <div className="grid md:grid-cols-2 gap-3">
+        <div className="bg-white rounded-xl shadow p-4">
+          <p className="text-xs text-slate-500">Preventivi {new Date().getFullYear()} · {cerca || 'tutti'} · {stats.corrente.n}</p>
+          <p className="text-xl font-bold">EUR {stats.corrente.totale.toFixed(2)}</p>
+          <p className="text-sm text-slate-500">Imponibile {stats.corrente.imponibile.toFixed(2)} · IVA {stats.corrente.iva.toFixed(2)}</p>
+        </div>
+        <div className="bg-white rounded-xl shadow p-4">
+          <p className="text-xs text-slate-500">Preventivi {filtroAnno || 'tutti gli anni'} · {cerca || 'tutti'} · {stats.scelto.n}</p>
+          <p className="text-xl font-bold">EUR {stats.scelto.totale.toFixed(2)}</p>
+          <p className="text-sm text-slate-500">Imponibile {stats.scelto.imponibile.toFixed(2)} · IVA {stats.scelto.iva.toFixed(2)}</p>
+        </div>
+      </div>
       <div className="flex flex-wrap gap-2 bg-white p-3 rounded-xl shadow">
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Cerca numero o cliente..." className="border rounded-lg px-3 py-2 text-sm flex-1 min-w-[160px]" />
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Cerca cliente o numero..." className="border rounded-lg px-3 py-2 text-sm flex-1 min-w-[160px]" />
         <select value={filtroAnno} onChange={e => setFiltroAnno(e.target.value)} className="border rounded-lg px-2 py-2 text-sm">
           <option value="">Tutti gli anni</option>
           <option value="2026">2026</option>
@@ -125,8 +157,7 @@ export default function Lista() {
             <select value={row.status || 'non_spedito'} onChange={e => setStatus(row.id, e.target.value)} className={'text-sm border rounded-lg px-2 py-1 ' + statoClass(row.status || 'non_spedito')}>
               {STATI.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
-            <span className={'text-xs px-2 py-1 rounded-full ' + statoClass(row.status || 'non_spedito')}>{statoLabel(row.status || 'non_spedito')}</span>
-            <button type="button" onClick={() => duplica(row)} className="text-sm text-blue-600">Duplica</button>
+            <button type="button" onClick={() => creaFattura(row)} className="text-sm bg-slate-900 text-white px-3 py-1 rounded-lg">Crea fattura</button>
             <button type="button" onClick={() => elimina(row.id)} className="text-sm text-red-600">Elimina</button>
           </div>
         ))}
