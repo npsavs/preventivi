@@ -3,6 +3,9 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { format, parseISO } from 'date-fns'
 import { it } from 'date-fns/locale'
+import * as pdfjs from 'pdfjs-dist'
+
+pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.8.69/pdf.worker.min.mjs'
 
 const STATI = [
   { value: 'non_spedito', label: 'Non spedito' },
@@ -10,10 +13,6 @@ const STATI = [
   { value: 'accettato', label: 'Accettato' },
   { value: 'rifiutato', label: 'Rifiutato' },
 ]
-
-function statoLabel(v: string) {
-  return STATI.find(s => s.value === v)?.label || 'Non spedito'
-}
 
 function statoClass(v: string) {
   if (v === 'accettato') return 'bg-green-100 text-green-800'
@@ -31,22 +30,67 @@ function trimestreDi(r: any) {
   return Math.floor(d.getMonth() / 3) + 1
 }
 
+function normalizza(v: string) {
+  return String(v || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+function numeroIt(v: string) {
+  const pulito = String(v || '').replace(/\./g, '').replace(',', '.')
+  const n = Number(pulito)
+  return Number.isFinite(n) ? n : 0
+}
+
+function numeroPreventivo(testo: string, nomeFile: string) {
+  const m = testo.match(/PREVENTIVO\s+Nr\.?\s*([0-9]+\/[0-9]{4})/i)
+  return m ? m[1] : nomeFile.replace(/\.pdf$/i, '')
+}
+
+function nomeDestinatario(testo: string) {
+  const m = testo.match(/DESTINATARIO[\s\S]{0,120}?([A-Z][A-Za-z']+(?:\s+[A-Z][A-Za-z']+)+)/)
+  return m ? m[1].trim() : ''
+}
+
+function imponibileDaTesto(testo: string) {
+  const m = testo.match(/Imponibile[\s\S]{0,40}?(\d{1,3}(?:\.\d{3})*,\d{2})/i)
+  if (m) return numeroIt(m[1])
+  const tutti = testo.match(/(\d{1,3}(?:\.\d{3})*,\d{2})/g) || []
+  const numeri = tutti.map(numeroIt).filter(n => n > 0)
+  return numeri.length ? Math.max(...numeri) : 0
+}
+
+async function testoPdf(file: File) {
+  const buf = await file.arrayBuffer()
+  const doc = await pdfjs.getDocument({ data: buf }).promise
+  let testo = ''
+  for (let i = 1; i <= doc.numPages; i++) {
+    const page = await doc.getPage(i)
+    const content = await page.getTextContent()
+    testo += '\n' + content.items.map((it: any) => it.str || '').join(' ')
+  }
+  return testo
+}
+
 export default function Lista() {
   const [quotes, setQuotes] = useState<any[]>([])
   const [itemsAll, setItemsAll] = useState<any[]>([])
+  const [clients, setClients] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
   const [filtro, setFiltro] = useState('tutti')
   const [filtroAnno, setFiltroAnno] = useState(String(new Date().getFullYear()))
   const [trim, setTrim] = useState(Math.floor(new Date().getMonth() / 3) + 1)
+  const [clienteImport, setClienteImport] = useState('')
+  const [cercaImport, setCercaImport] = useState('')
 
   useEffect(() => { load() }, [])
 
   async function load() {
     const { data } = await supabase.from('quotes').select('*, clients(name)').order('created_at', { ascending: false })
     const { data: it } = await supabase.from('quote_items').select('quote_id, quantity, unit_price, name, description')
+    const { data: cl } = await supabase.from('clients').select('id, name').order('name')
     setQuotes(data || [])
     setItemsAll(it || [])
+    setClients(cl || [])
     setLoading(false)
   }
 
@@ -62,23 +106,51 @@ export default function Lista() {
     load()
   }
 
+  function trovaCliente(testo: string, nomeFile: string) {
+    if (clienteImport) return clienteImport
+    const daPdf = nomeDestinatario(testo)
+    const t = normalizza(testo + ' ' + nomeFile + ' ' + daPdf)
+    const trovato = clients
+      .map(c => ({ id: c.id, name: c.name, n: normalizza(c.name) }))
+      .filter(c => c.n.length >= 4 && t.includes(c.n))
+      .sort((a, b) => b.n.length - a.n.length)[0]
+    return trovato?.id || null
+  }
+
   async function importaPdf(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files
     if (!files || files.length === 0) return
     let ok = 0
+    let senza = 0
     for (const file of Array.from(files)) {
       if (!file.name.toLowerCase().endsWith('.pdf')) continue
-      const nome = file.name.replace(/\.pdf$/i, '')
-      const { error } = await supabase.from('quotes').insert({
-        quote_number: nome,
+      let testo = ''
+      try { testo = await testoPdf(file) } catch { testo = '' }
+      const numero = numeroPreventivo(testo, file.name)
+      const clientId = trovaCliente(testo, file.name)
+      if (!clientId) senza++
+      const imponibile = imponibileDaTesto(testo)
+      const ins = await supabase.from('quotes').insert({
+        quote_number: numero,
         status: 'non_spedito',
         oggetto: 'Importato da PDF: ' + file.name,
         notes: 'Importato da PDF: ' + file.name,
-      })
-      if (!error) ok++
+        client_id: clientId,
+      }).select().single()
+      if (ins.error || !ins.data) continue
+      if (imponibile > 0) {
+        await supabase.from('quote_items').insert({
+          quote_id: ins.data.id,
+          name: 'Imponibile importato da PDF',
+          description: 'Riga automatica per le statistiche',
+          quantity: 1,
+          unit_price: imponibile,
+        })
+      }
+      ok++
     }
     e.target.value = ''
-    alert('Importati ' + ok + ' preventivi. I materiali non sono stati toccati.')
+    alert('Importati ' + ok + ' preventivi.' + (senza ? ' ' + senza + ' senza cliente (nome non in anagrafica).' : ''))
     load()
   }
 
@@ -140,19 +212,27 @@ export default function Lista() {
   }, [quotes, itemsAll, filtered, trim])
 
   const nomeFiltro = STATI.find(s => s.value === filtro)?.label || 'Tutti'
+  const clientiFiltrati = cercaImport.trim().length < 2 ? [] : clients.filter(c => c.name.toLowerCase().includes(cercaImport.toLowerCase())).slice(0, 8)
+  const clienteScelto = clients.find(c => c.id === clienteImport)
   if (loading) return <div className="text-center py-10">Caricamento...</div>
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center flex-wrap gap-2">
         <h1 className="text-2xl font-bold">Preventivi</h1>
-        <div className="flex gap-2">
-          <label className="border px-4 py-2 rounded-lg bg-white cursor-pointer">
-            Importa PDF
-            <input type="file" accept="application/pdf" multiple onChange={importaPdf} className="hidden" />
-          </label>
-          <Link to="/nuovo" className="bg-slate-900 text-white px-4 py-2 rounded-lg">+ Nuovo preventivo</Link>
-        </div>
+        <Link to="/nuovo" className="bg-slate-900 text-white px-4 py-2 rounded-lg">+ Nuovo preventivo</Link>
+      </div>
+      <div className="bg-white rounded-xl shadow p-3 space-y-2">
+        <p className="text-sm font-medium">Importa PDF. Legge numero, destinatario e imponibile dal file.</p>
+        <input value={cercaImport} onChange={e => setCercaImport(e.target.value)} placeholder="Opzionale: forza un cliente per tutti..." className="w-full border rounded-lg px-3 py-2 text-sm" />
+        {clientiFiltrati.map(c => (
+          <button key={c.id} type="button" onClick={() => { setClienteImport(c.id); setCercaImport(c.name) }} className="block text-left text-sm px-2 py-1 hover:bg-blue-50 w-full">{c.name}</button>
+        ))}
+        {clienteScelto ? <p className="text-sm text-green-700">Cliente forzato: {clienteScelto.name}</p> : null}
+        <label className="inline-block border px-4 py-2 rounded-lg bg-white cursor-pointer">
+          Importa PDF
+          <input type="file" accept="application/pdf" multiple onChange={importaPdf} className="hidden" />
+        </label>
       </div>
       <div className="flex flex-wrap gap-2 bg-white p-3 rounded-xl shadow">
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Cerca cliente o numero..." className="border rounded-lg px-3 py-2 text-sm flex-1 min-w-[160px]" />
