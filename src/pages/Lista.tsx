@@ -49,19 +49,29 @@ function imponibileDaTesto(testo: string) {
   return tutti.length ? Math.max(...tutti) : 0
 }
 
+function nomeDestinatario(testo: string) {
+  const m = testo.match(/DESTINATARIO\s+([A-Za-z][A-Za-z']+(?:\s+[A-Za-z][A-Za-z']+){0,3})/)
+  return m ? m[1].trim() : ''
+}
+
 function trovaCliente(testo: string, clients: any[], forzato: string) {
   if (forzato) {
     const c = clients.find(x => x.id === forzato)
     return { id: forzato, name: c?.name || '' }
   }
+  const daPdf = nomeDestinatario(testo)
   const t = normalizza(testo)
+  const stop = new Set(['iva', 'spa', 'srl', 'snc', 'sas', 'gruppo', 'societa', 'ditta', 'azienda'])
   const candidati = clients.map(c => {
-    const parti = String(c.name || '').split(/\s+/).filter(p => p.length >= 3)
+    const parti = String(c.name || '').split(/\s+/).filter(p => p.length >= 4 && !stop.has(normalizza(p)))
     const ok = parti.filter(p => t.includes(normalizza(p))).length
-    return { id: c.id, name: c.name, ok, n: normalizza(c.name) }
-  }).filter(c => c.ok >= 2 || (c.n.length >= 6 && t.includes(c.n)))
-  candidati.sort((a, b) => b.ok - a.ok || b.n.length - a.n.length)
-  return candidati[0] || { id: null, name: '' }
+    const intero = normalizza(c.name)
+    const pieno = intero.length >= 6 && t.includes(intero)
+    const comePdf = daPdf && normalizza(c.name) === normalizza(daPdf)
+    return { id: c.id, name: c.name, ok, pieno, comePdf, n: intero }
+  }).filter(c => c.comePdf || c.pieno || c.ok >= 2)
+  candidati.sort((a, b) => Number(b.comePdf) - Number(a.comePdf) || Number(b.pieno) - Number(a.pieno) || b.ok - a.ok || b.n.length - a.n.length)
+  return candidati[0] || { id: null, name: daPdf || '' }
 }
 
 async function caricaPdf() {
