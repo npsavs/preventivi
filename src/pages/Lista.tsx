@@ -74,6 +74,21 @@ function trovaCliente(testo: string, clients: any[], forzato: string) {
   return candidati[0] || { id: null, name: daPdf || '' }
 }
 
+function righeDaTesto(testo: string) {
+  const righe: { name: string; quantity: number; unit_price: number }[] = []
+  const pezzi = testo.split(/(?=\d+\s+\d{1,3}(?:\.\d{3})*,\d{2}\s+€?\s*\d{1,3}(?:\.\d{3})*,\d{2})/)
+  for (const pezzo of pezzi) {
+    const m = pezzo.match(/(.{5,200}?)\s+(\d+)\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s+€?\s*(\d{1,3}(?:\.\d{3})*,\d{2})/)
+    if (!m) continue
+    const name = m[1].replace(/\s+/g, ' ').trim().slice(-80)
+    if (/descrizione|totale|imponibile|iva|cover|preventivo/i.test(name)) continue
+    const q = Number(m[2])
+    const p = numeroIt(m[3])
+    if (q > 0 && p > 0) righe.push({ name, quantity: q, unit_price: p })
+  }
+  return righe
+}
+
 async function caricaPdf() {
   const w = window as any
   if (w.pdfjsLib) return w.pdfjsLib
@@ -131,192 +146,3 @@ export default function Lista() {
     await supabase.from('quotes').update({ status }).eq('id', id)
     load()
   }
-
-  async function elimina(id: string) {
-    if (!confirm('Eliminare questo preventivo?')) return
-    await supabase.from('quote_items').delete().eq('quote_id', id)
-    await supabase.from('quotes').delete().eq('id', id)
-    load()
-  }
-
-  async function importaPdf(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files
-    if (!files || files.length === 0) return
-    const esiti: string[] = []
-    for (const file of Array.from(files)) {
-      if (!file.name.toLowerCase().endsWith('.pdf')) continue
-      let testo = ''
-      try { testo = await testoPdf(file) } catch (err: any) { esiti.push(file.name + ': non letto (' + (err?.message || 'errore') + ')'); continue }
-      const numero = numeroPreventivo(testo, file.name)
-      const trovato = trovaCliente(testo, clients, clienteImport)
-      const imponibile = imponibileDaTesto(testo)
-      const ins = await supabase.from('quotes').insert({
-        quote_number: numero,
-        status: 'non_spedito',
-        oggetto: 'Importato da PDF: ' + file.name,
-        notes: 'Importato da PDF: ' + file.name,
-        client_id: trovato.id,
-      }).select().single()
-      if (ins.error || !ins.data) {
-        esiti.push(file.name + ': errore salvataggio')
-        continue
-      }
-      if (imponibile > 0) {
-        await supabase.from('quote_items').insert({
-          quote_id: ins.data.id,
-          name: 'Imponibile importato da PDF',
-          description: 'Riga automatica per le statistiche',
-          quantity: 1,
-          unit_price: imponibile,
-        })
-      }
-      esiti.push(numero + ' → ' + (trovato.name || 'NESSUN CLIENTE') + ' · EUR ' + imponibile.toFixed(2))
-      setDebug(testo.slice(0, 800))
-    }
-    e.target.value = ''
-    alert(esiti.join('\n') || 'Nessun PDF')
-    load()
-  }
-
-  async function creaFattura(row: any) {
-    if (!row.client_id) return alert('Manca il cliente in anagrafica')
-    if (!confirm('Creare una fattura dalle righe di ' + row.quote_number + '?')) return
-    const year = new Date().getFullYear()
-    const { data: esistenti } = await supabase.from('invoices').select('invoice_number, invoice_type')
-    const usati = (esistenti || []).filter(x => (x.invoice_type || 'fattura') === 'fattura').map(x => {
-      const m = String(x.invoice_number || '').match(/^(\d+)\/(\d{4})$/)
-      if (m && Number(m[2]) === year) return Number(m[1])
-      return 0
-    })
-    const numero = (Math.max(0, ...usati) + 1) + '/' + year
-    const inv = await supabase.from('invoices').insert({
-      invoice_number: numero,
-      client_id: row.client_id,
-      invoice_type: 'fattura',
-      sdi_status: 'bozza',
-      oggetto: row.oggetto || ('Da preventivo ' + row.quote_number),
-      invoice_date: format(new Date(), 'yyyy-MM-dd'),
-    }).select().single()
-    if (inv.error || !inv.data) return alert(inv.error?.message || 'Fattura non creata')
-    const { data: dettagli } = await supabase.from('quote_items').select('*').eq('quote_id', row.id)
-    if (dettagli && dettagli.length) {
-      await supabase.from('invoice_items').insert(dettagli.map(i => ({
-        invoice_id: inv.data.id,
-        name: i.name,
-        description: i.description,
-        quantity: i.quantity,
-        unit_price: i.unit_price,
-        vat_rate: 22,
-      })))
-    }
-    window.open('https://fatture-self.vercel.app/fattura/' + inv.data.id, '_blank')
-  }
-
-  const cerca = q.trim().toLowerCase()
-  const annoCorrente = String(new Date().getFullYear())
-  const filtered = quotes.filter(row => {
-    if (cerca && !(String(row.quote_number || '').toLowerCase().includes(cerca) || String(row.clients?.name || '').toLowerCase().includes(cerca))) return false
-    if (filtroAnno && annoDi(row) !== filtroAnno) return false
-    if (filtro !== 'tutti' && (row.status || 'non_spedito') !== filtro) return false
-    return true
-  })
-
-  const stats = useMemo(() => {
-    function conto(lista: any[]) {
-      const ids = new Set(lista.map(r => r.id))
-      const imponibile = itemsAll.filter(i => ids.has(i.quote_id)).reduce((s, i) => s + Number(i.quantity) * Number(i.unit_price), 0)
-      return { imponibile, iva: imponibile * 0.22, totale: imponibile * 1.22, n: lista.length }
-    }
-    return {
-      anno: conto(quotes.filter(r => annoDi(r) === annoCorrente)),
-      trim: conto(quotes.filter(r => annoDi(r) === annoCorrente && trimestreDi(r) === trim)),
-      filtro: conto(filtered),
-      filtroTrim: conto(filtered.filter(r => trimestreDi(r) === trim)),
-    }
-  }, [quotes, itemsAll, filtered, trim])
-
-  const nomeFiltro = STATI.find(s => s.value === filtro)?.label || 'Tutti'
-  const clientiFiltrati = cercaImport.trim().length < 2 ? [] : clients.filter(c => c.name.toLowerCase().includes(cercaImport.toLowerCase())).slice(0, 8)
-  const clienteScelto = clients.find(c => c.id === clienteImport)
-  if (loading) return <div className="text-center py-10">Caricamento...</div>
-
-  return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center flex-wrap gap-2">
-        <h1 className="text-2xl font-bold">Preventivi</h1>
-        <Link to="/nuovo" className="bg-slate-900 text-white px-4 py-2 rounded-lg">+ Nuovo preventivo</Link>
-      </div>
-      <div className="bg-white rounded-xl shadow p-3 space-y-2">
-        <p className="text-sm font-medium">Importa PDF. Collega il cliente se nome e cognome sono in anagrafica.</p>
-        <input value={cercaImport} onChange={e => setCercaImport(e.target.value)} placeholder="Opzionale: forza un cliente per tutti..." className="w-full border rounded-lg px-3 py-2 text-sm" />
-        {clientiFiltrati.map(c => (
-          <button key={c.id} type="button" onClick={() => { setClienteImport(c.id); setCercaImport(c.name) }} className="block text-left text-sm px-2 py-1 hover:bg-blue-50 w-full">{c.name}</button>
-        ))}
-        {clienteScelto ? <p className="text-sm text-green-700">Cliente forzato: {clienteScelto.name}</p> : null}
-        <label className="inline-block border px-4 py-2 rounded-lg bg-white cursor-pointer">
-          Importa PDF
-          <input type="file" accept="application/pdf" multiple onChange={importaPdf} className="hidden" />
-        </label>
-      </div>
-      {debug ? (
-        <div className="bg-amber-50 border rounded-lg p-3 text-xs whitespace-pre-wrap">
-          <p className="font-semibold mb-1">Testo letto dal PDF (prime 800 lettere):</p>
-          {debug}
-        </div>
-      ) : null}
-      <div className="flex flex-wrap gap-2 bg-white p-3 rounded-xl shadow">
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Cerca cliente o numero..." className="border rounded-lg px-3 py-2 text-sm flex-1 min-w-[160px]" />
-        <select value={filtroAnno} onChange={e => setFiltroAnno(e.target.value)} className="border rounded-lg px-2 py-2 text-sm">
-          <option value="">Tutti gli anni</option>
-          <option value="2026">2026</option>
-          <option value="2025">2025</option>
-        </select>
-        {[1, 2, 3, 4].map(t => (
-          <button key={t} type="button" onClick={() => setTrim(t)} className={'px-3 py-2 rounded-lg text-sm ' + (trim === t ? 'bg-blue-700 text-white' : 'border')}>T{t}</button>
-        ))}
-        <button type="button" onClick={() => setFiltro('tutti')} className={'px-3 py-2 rounded-lg text-sm ' + (filtro === 'tutti' ? 'bg-slate-900 text-white' : 'border')}>Tutti</button>
-        {STATI.map(s => (
-          <button key={s.value} type="button" onClick={() => setFiltro(s.value)} className={'px-3 py-2 rounded-lg text-sm ' + (filtro === s.value ? 'bg-slate-900 text-white' : 'border')}>{s.label}</button>
-        ))}
-      </div>
-      <div className="grid md:grid-cols-2 gap-3">
-        <div className="bg-white rounded-xl shadow p-4">
-          <p className="text-xs text-slate-500">Totale preventivi {annoCorrente}</p>
-          <p className="text-xl font-bold">EUR {stats.anno.totale.toFixed(2)}</p>
-          <p className="text-sm text-slate-500">Imponibile {stats.anno.imponibile.toFixed(2)} · IVA {stats.anno.iva.toFixed(2)} · {stats.anno.n}</p>
-        </div>
-        <div className="bg-white rounded-xl shadow p-4">
-          <p className="text-xs text-slate-500">Trimestre T{trim} {annoCorrente}</p>
-          <p className="text-xl font-bold">EUR {stats.trim.totale.toFixed(2)}</p>
-          <p className="text-sm text-slate-500">Imponibile {stats.trim.imponibile.toFixed(2)} · IVA {stats.trim.iva.toFixed(2)} · {stats.trim.n}</p>
-        </div>
-        <div className="bg-white rounded-xl shadow p-4">
-          <p className="text-xs text-slate-500">Filtro · {nomeFiltro} · {cerca || 'tutti'} · {filtroAnno || 'tutti gli anni'}</p>
-          <p className="text-xl font-bold">EUR {stats.filtro.totale.toFixed(2)}</p>
-          <p className="text-sm text-slate-500">Imponibile {stats.filtro.imponibile.toFixed(2)} · IVA {stats.filtro.iva.toFixed(2)} · {stats.filtro.n}</p>
-        </div>
-        <div className="bg-white rounded-xl shadow p-4">
-          <p className="text-xs text-slate-500">Filtro T{trim} · {nomeFiltro} · {cerca || 'tutti'}</p>
-          <p className="text-xl font-bold">EUR {stats.filtroTrim.totale.toFixed(2)}</p>
-          <p className="text-sm text-slate-500">Imponibile {stats.filtroTrim.imponibile.toFixed(2)} · IVA {stats.filtroTrim.iva.toFixed(2)} · {stats.filtroTrim.n}</p>
-        </div>
-      </div>
-      <div className="bg-white rounded-xl shadow divide-y">
-        {filtered.length === 0 ? <p className="p-6 text-center text-slate-500">Nessun preventivo</p> : null}
-        {filtered.map(row => (
-          <div key={row.id} className="px-4 py-3 flex flex-wrap items-center gap-3">
-            <Link to={'/preventivo/' + row.id} className="flex-1 min-w-[180px]">
-              <p className="font-medium">{row.quote_number} · {row.clients?.name || 'Senza cliente'}</p>
-              <p className="text-sm text-slate-500">{format(parseISO(row.created_at), 'dd MMM yyyy', { locale: it })}</p>
-            </Link>
-            <select value={row.status || 'non_spedito'} onChange={e => setStatus(row.id, e.target.value)} className={'text-sm border rounded-lg px-2 py-1 ' + statoClass(row.status || 'non_spedito')}>
-              {STATI.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-            </select>
-            <button type="button" onClick={() => creaFattura(row)} className="text-sm bg-slate-900 text-white px-3 py-1 rounded-lg">Crea fattura</button>
-            <button type="button" onClick={() => elimina(row.id)} className="text-sm text-red-600">Elimina</button>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
