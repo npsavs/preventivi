@@ -3,9 +3,6 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { format, parseISO } from 'date-fns'
 import { it } from 'date-fns/locale'
-import * as pdfjs from 'pdfjs-dist'
-
-pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.8.69/pdf.worker.min.mjs'
 
 const STATI = [
   { value: 'non_spedito', label: 'Non spedito' },
@@ -67,7 +64,23 @@ function trovaCliente(testo: string, clients: any[], forzato: string) {
   return candidati[0] || { id: null, name: '' }
 }
 
+async function caricaPdf() {
+  const w = window as any
+  if (w.pdfjsLib) return w.pdfjsLib
+  await new Promise((resolve, reject) => {
+    const s = document.createElement('script')
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.8.69/pdf.min.mjs'
+    s.type = 'module'
+    s.onload = () => resolve(null)
+    s.onerror = () => reject(new Error('PDF non caricato'))
+    document.body.appendChild(s)
+  })
+  return w.pdfjsLib
+}
+
 async function testoPdf(file: File) {
+  const pdfjs = await caricaPdf()
+  if (pdfjs.GlobalWorkerOptions) pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.8.69/pdf.worker.min.mjs'
   const buf = await file.arrayBuffer()
   const doc = await pdfjs.getDocument({ data: buf }).promise
   let testo = ''
