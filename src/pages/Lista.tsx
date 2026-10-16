@@ -18,7 +18,7 @@ function statoLabel(v: string) {
 function statoClass(v: string) {
   if (v === 'accettato') return 'bg-green-100 text-green-800'
   if (v === 'rifiutato') return 'bg-red-100 text-red-800'
-  if (v === 'in_attesa') return 'bg-yellow-100 text-yellow-800'
+  if (v === 'in_attesa') return 'bg-amber-100 text-amber-800'
   return 'bg-slate-100 text-slate-700'
 }
 
@@ -59,6 +59,26 @@ export default function Lista() {
     if (!confirm('Eliminare questo preventivo?')) return
     await supabase.from('quote_items').delete().eq('quote_id', id)
     await supabase.from('quotes').delete().eq('id', id)
+    load()
+  }
+
+  async function importaPdf(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+    let ok = 0
+    for (const file of Array.from(files)) {
+      if (!file.name.toLowerCase().endsWith('.pdf')) continue
+      const nome = file.name.replace(/\.pdf$/i, '')
+      const { error } = await supabase.from('quotes').insert({
+        quote_number: nome,
+        status: 'non_spedito',
+        oggetto: 'Importato da PDF: ' + file.name,
+        notes: 'Importato da PDF: ' + file.name,
+      })
+      if (!error) ok++
+    }
+    e.target.value = ''
+    alert('Importati ' + ok + ' preventivi. I materiali non sono stati toccati.')
     load()
   }
 
@@ -126,7 +146,13 @@ export default function Lista() {
     <div className="space-y-4">
       <div className="flex justify-between items-center flex-wrap gap-2">
         <h1 className="text-2xl font-bold">Preventivi</h1>
-        <Link to="/nuovo" className="bg-slate-900 text-white px-4 py-2 rounded-lg">+ Nuovo preventivo</Link>
+        <div className="flex gap-2">
+          <label className="border px-4 py-2 rounded-lg bg-white cursor-pointer">
+            Importa PDF
+            <input type="file" accept="application/pdf" multiple onChange={importaPdf} className="hidden" />
+          </label>
+          <Link to="/nuovo" className="bg-slate-900 text-white px-4 py-2 rounded-lg">+ Nuovo preventivo</Link>
+        </div>
       </div>
       <div className="flex flex-wrap gap-2 bg-white p-3 rounded-xl shadow">
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Cerca cliente o numero..." className="border rounded-lg px-3 py-2 text-sm flex-1 min-w-[160px]" />
