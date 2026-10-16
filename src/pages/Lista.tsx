@@ -41,16 +41,30 @@ function numeroIt(v: string) {
 }
 
 function numeroPreventivo(testo: string, nomeFile: string) {
-  const m = testo.match(/PREVENTIVO\s+Nr\.?\s*([0-9]+\/[0-9]{4})/i)
+  const m = testo.match(/(\d{1,5}\/\d{4})/)
   return m ? m[1] : nomeFile.replace(/\.pdf$/i, '')
 }
 
 function imponibileDaTesto(testo: string) {
-  const m = testo.match(/Imponibile[\s\S]{0,60}?(\d{1,3}(?:\.\d{3})*,\d{2})/i)
-  if (m) return numeroIt(m[1])
-  const tutti = testo.match(/(\d{1,3}(?:\.\d{3})*,\d{2})/g) || []
-  const numeri = tutti.map(numeroIt).filter(n => n > 0)
-  return numeri.length ? Math.max(...numeri) : 0
+  const zone = testo.match(/imponibile[^0-9]{0,80}(\d{1,3}(?:\.\d{3})*,\d{2})/i)
+  if (zone) return numeroIt(zone[1])
+  const tutti = (testo.match(/\d{1,3}(?:\.\d{3})*,\d{2}/g) || []).map(numeroIt).filter(n => n > 50)
+  return tutti.length ? Math.max(...tutti) : 0
+}
+
+function trovaCliente(testo: string, clients: any[], forzato: string) {
+  if (forzato) {
+    const c = clients.find(x => x.id === forzato)
+    return { id: forzato, name: c?.name || '' }
+  }
+  const t = normalizza(testo)
+  const candidati = clients.map(c => {
+    const parti = String(c.name || '').split(/\s+/).filter(p => p.length >= 3)
+    const ok = parti.filter(p => t.includes(normalizza(p))).length
+    return { id: c.id, name: c.name, ok, n: normalizza(c.name) }
+  }).filter(c => c.ok >= 2 || (c.n.length >= 6 && t.includes(c.n)))
+  candidati.sort((a, b) => b.ok - a.ok || b.n.length - a.n.length)
+  return candidati[0] || { id: null, name: '' }
 }
 
 async function testoPdf(file: File) {
@@ -101,16 +115,6 @@ export default function Lista() {
     load()
   }
 
-  function trovaCliente(testo: string) {
-    if (clienteImport) return { id: clienteImport, name: '' }
-    const t = normalizza(testo)
-    const trovati = clients
-      .map(c => ({ id: c.id, name: c.name, n: normalizza(c.name) }))
-      .filter(c => c.n.length >= 5 && t.includes(c.n))
-      .sort((a, b) => b.n.length - a.n.length)
-    return trovati[0] || { id: null, name: '' }
-  }
-
   async function importaPdf(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files
     if (!files || files.length === 0) return
@@ -118,9 +122,9 @@ export default function Lista() {
     for (const file of Array.from(files)) {
       if (!file.name.toLowerCase().endsWith('.pdf')) continue
       let testo = ''
-      try { testo = await testoPdf(file) } catch { testo = '' }
+      try { testo = await testoPdf(file) } catch (err: any) { esiti.push(file.name + ': non letto (' + (err?.message || 'errore') + ')'); continue }
       const numero = numeroPreventivo(testo, file.name)
-      const trovato = trovaCliente(testo)
+      const trovato = trovaCliente(testo, clients, clienteImport)
       const imponibile = imponibileDaTesto(testo)
       const ins = await supabase.from('quotes').insert({
         quote_number: numero,
@@ -130,7 +134,7 @@ export default function Lista() {
         client_id: trovato.id,
       }).select().single()
       if (ins.error || !ins.data) {
-        esiti.push(file.name + ': errore ' + (ins.error?.message || ''))
+        esiti.push(file.name + ': errore salvataggio')
         continue
       }
       if (imponibile > 0) {
@@ -142,7 +146,7 @@ export default function Lista() {
           unit_price: imponibile,
         })
       }
-      esiti.push(numero + ' → ' + (trovato.name || 'nessun cliente trovato') + ' · EUR ' + imponibile.toFixed(2))
+      esiti.push(numero + ' → ' + (trovato.name || 'NESSUN CLIENTE') + ' · EUR ' + imponibile.toFixed(2))
     }
     e.target.value = ''
     alert(esiti.join('\n') || 'Nessun PDF')
@@ -218,7 +222,7 @@ export default function Lista() {
         <Link to="/nuovo" className="bg-slate-900 text-white px-4 py-2 rounded-lg">+ Nuovo preventivo</Link>
       </div>
       <div className="bg-white rounded-xl shadow p-3 space-y-2">
-        <p className="text-sm font-medium">Importa PDF. Collega il cliente solo se il nome è già in anagrafica.</p>
+        <p className="text-sm font-medium">Importa PDF. Collega il cliente se nome e cognome sono in anagrafica.</p>
         <input value={cercaImport} onChange={e => setCercaImport(e.target.value)} placeholder="Opzionale: forza un cliente per tutti..." className="w-full border rounded-lg px-3 py-2 text-sm" />
         {clientiFiltrati.map(c => (
           <button key={c.id} type="button" onClick={() => { setClienteImport(c.id); setCercaImport(c.name) }} className="block text-left text-sm px-2 py-1 hover:bg-blue-50 w-full">{c.name}</button>
