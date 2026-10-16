@@ -46,7 +46,7 @@ function numeroPreventivo(testo: string, nomeFile: string) {
 }
 
 function imponibileDaTesto(testo: string) {
-  const zone = testo.match(/imponibile[^0-9]{0,80}(\d{1,3}(?:\.\d{3})*,\d{2})/i)
+  const zone = testo.match(/imponibile[^0-9]{0,120}(\d{1,3}(?:\.\d{3})*,\d{2})/i)
   if (zone) return numeroIt(zone[1])
   const tutti = (testo.match(/\d{1,3}(?:\.\d{3})*,\d{2}/g) || []).map(numeroIt).filter(n => n > 50)
   return tutti.length ? Math.max(...tutti) : 0
@@ -90,6 +90,7 @@ export default function Lista() {
   const [trim, setTrim] = useState(Math.floor(new Date().getMonth() / 3) + 1)
   const [clienteImport, setClienteImport] = useState('')
   const [cercaImport, setCercaImport] = useState('')
+  const [debug, setDebug] = useState('')
 
   useEffect(() => { load() }, [])
 
@@ -147,6 +148,7 @@ export default function Lista() {
         })
       }
       esiti.push(numero + ' → ' + (trovato.name || 'NESSUN CLIENTE') + ' · EUR ' + imponibile.toFixed(2))
+      setDebug(testo.slice(0, 800))
     }
     e.target.value = ''
     alert(esiti.join('\n') || 'Nessun PDF')
@@ -233,6 +235,12 @@ export default function Lista() {
           <input type="file" accept="application/pdf" multiple onChange={importaPdf} className="hidden" />
         </label>
       </div>
+      {debug ? (
+        <div className="bg-amber-50 border rounded-lg p-3 text-xs whitespace-pre-wrap">
+          <p className="font-semibold mb-1">Testo letto dal PDF (prime 800 lettere):</p>
+          {debug}
+        </div>
+      ) : null}
       <div className="flex flex-wrap gap-2 bg-white p-3 rounded-xl shadow">
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Cerca cliente o numero..." className="border rounded-lg px-3 py-2 text-sm flex-1 min-w-[160px]" />
         <select value={filtroAnno} onChange={e => setFiltroAnno(e.target.value)} className="border rounded-lg px-2 py-2 text-sm">
