@@ -43,6 +43,11 @@ function numeroIt(v: string) {
   return Number.isFinite(n) ? n : 0
 }
 
+function numeroPreventivo(testo: string, nomeFile: string) {
+  const m = testo.match(/(\d{1,5}\/\d{4})/)
+  return m ? m[1] : nomeFile.replace(/\.pdf$/i, '')
+}
+
 function dataPreventivo(testo: string) {
   const m = testo.match(/del\s+(\d{1,2})[\/.](\d{1,2})[\/.](\d{4})/i)
   if (!m) return null
