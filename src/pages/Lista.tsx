@@ -50,8 +50,9 @@ function imponibileDaTesto(testo: string) {
 }
 
 function nomeDestinatario(testo: string) {
-  const m = testo.match(/DESTINATARIO\s+([A-Za-z][A-Za-z']+(?:\s+[A-Za-z][A-Za-z']+){0,3})/)
-  return m ? m[1].trim() : ''
+  const m = testo.match(/DESTINATARIO\s+([A-Za-z][A-Za-z']+\s+[A-Za-z][A-Za-z']+)/)
+  if (!m) return ''
+  return m[1].replace(/\s+Via\b.*$/i, '').trim()
 }
 
 function trovaCliente(testo: string, clients: any[], forzato: string) {
