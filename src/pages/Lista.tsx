@@ -51,8 +51,7 @@ function imponibileDaTesto(testo: string) {
 
 function nomeDestinatario(testo: string) {
   const m = testo.match(/DESTINATARIO\s+([A-Za-z][A-Za-z']+\s+[A-Za-z][A-Za-z']+)/)
-  if (!m) return ''
-  return m[1].replace(/\s+Via\b.*$/i, '').trim()
+  return m ? m[1].trim() : ''
 }
 
 function trovaCliente(testo: string, clients: any[], forzato: string) {
@@ -61,35 +60,12 @@ function trovaCliente(testo: string, clients: any[], forzato: string) {
     return { id: forzato, name: c?.name || '' }
   }
   const daPdf = nomeDestinatario(testo)
-  if (daPdf) {
-    const esatto = clients.find(c => normalizza(c.name) === normalizza(daPdf))
-    if (esatto) return { id: esatto.id, name: esatto.name }
-    const contiene = clients.find(c => normalizza(c.name).includes(normalizza(daPdf)) || normalizza(daPdf).includes(normalizza(c.name)))
-    if (contiene) return { id: contiene.id, name: contiene.name }
-  }
-  const t = normalizza(testo)
-  const stop = new Set(['iva', 'spa', 'srl', 'snc', 'sas', 'gruppo', 'societa', 'ditta', 'azienda', 'varani'])
-  const candidati = clients.map(c => {
-    const parti = String(c.name || '').split(/\s+/).filter(p => p.length >= 5 && !stop.has(normalizza(p)))
-    const ok = parti.filter(p => t.includes(normalizza(p))).length
-    return { id: c.id, name: c.name, ok }
-  }).filter(c => c.ok >= 2)
-  candidati.sort((a, b) => b.ok - a.ok)
-  return candidati[0] || { id: null as string | null, name: daPdf || '' }
-}
-
-function righeDaTesto(testo: string) {
-  const righe: { name: string; quantity: number; unit_price: number }[] = []
-  const re = /([A-Za-z][^0-9]{5,160}?)\s+(\d+)\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s+€?\s*(\d{1,3}(?:\.\d{3})*,\d{2})/g
-  let m: RegExpExecArray | null
-  while ((m = re.exec(testo)) !== null) {
-    const name = m[1].replace(/\s+/g, ' ').trim().slice(-80)
-    if (/descrizione|totale|imponibile|iva|cover|preventivo|oggetto/i.test(name)) continue
-    const q = Number(m[2])
-    const p = numeroIt(m[3])
-    if (q > 0 && p > 0) righe.push({ name, quantity: q, unit_price: p })
-  }
-  return righe
+  if (!daPdf) return { id: null as string | null, name: '' }
+  const esatto = clients.find(c => normalizza(c.name) === normalizza(daPdf))
+  if (esatto) return { id: esatto.id, name: esatto.name }
+  const contiene = clients.find(c => normalizza(c.name).includes(normalizza(daPdf)) || normalizza(daPdf).includes(normalizza(c.name)))
+  if (contiene) return { id: contiene.id, name: contiene.name }
+  return { id: null as string | null, name: daPdf }
 }
 
 async function caricaPdf() {
@@ -112,7 +88,7 @@ async function testoPdf(file: File) {
   const buf = await file.arrayBuffer()
   const doc = await pdfjs.getDocument({ data: buf }).promise
   let testo = ''
-  for (let i = 1; i <= doc.numPages; i++) {
+  for (let i = 1; i <= Math.min(doc.numPages, 2); i++) {
     const page = await doc.getPage(i)
     const content = await page.getTextContent()
     testo += '\n' + content.items.map((it: any) => it.str || '').join(' ')
@@ -131,7 +107,6 @@ export default function Lista() {
   const [trim, setTrim] = useState(Math.floor(new Date().getMonth() / 3) + 1)
   const [clienteImport, setClienteImport] = useState('')
   const [cercaImport, setCercaImport] = useState('')
-  const [debug, setDebug] = useState('')
 
   useEffect(() => { load() }, [])
 
@@ -164,41 +139,32 @@ export default function Lista() {
     for (const file of Array.from(files)) {
       if (!file.name.toLowerCase().endsWith('.pdf')) continue
       let testo = ''
-      try { testo = await testoPdf(file) } catch (err: any) { esiti.push(file.name + ': non letto (' + (err?.message || 'errore') + ')'); continue }
+      try { testo = await testoPdf(file) } catch { testo = '' }
       const numero = numeroPreventivo(testo, file.name)
       const trovato = trovaCliente(testo, clients, clienteImport)
       const imponibile = imponibileDaTesto(testo)
-      const righe = righeDaTesto(testo)
+      const path = 'preventivi/' + Date.now() + '-' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+      const up = await supabase.storage.from('prodotti').upload(path, file, { contentType: 'application/pdf', upsert: true })
+      if (up.error) { esiti.push(file.name + ': PDF non caricato (' + up.error.message + ')'); continue }
+      const url = supabase.storage.from('prodotti').getPublicUrl(path).data.publicUrl
       const ins = await supabase.from('quotes').insert({
         quote_number: numero,
         status: 'non_spedito',
-        oggetto: 'Importato da PDF: ' + file.name,
-        notes: testo.slice(0, 8000),
+        oggetto: 'Importato da PDF',
+        notes: url,
         client_id: trovato.id,
       }).select().single()
-      if (ins.error || !ins.data) {
-        esiti.push(file.name + ': errore salvataggio')
-        continue
-      }
-      if (righe.length) {
-        await supabase.from('quote_items').insert(righe.map(r => ({
-          quote_id: ins.data.id,
-          name: r.name,
-          description: 'Importato da PDF',
-          quantity: r.quantity,
-          unit_price: r.unit_price,
-        })))
-      } else if (imponibile > 0) {
+      if (ins.error || !ins.data) { esiti.push(file.name + ': errore salvataggio'); continue }
+      if (imponibile > 0) {
         await supabase.from('quote_items').insert({
           quote_id: ins.data.id,
           name: 'Imponibile importato da PDF',
-          description: 'Riga automatica per le statistiche',
+          description: 'Solo per le statistiche',
           quantity: 1,
           unit_price: imponibile,
         })
       }
-      esiti.push(numero + ' → ' + (trovato.name || 'NESSUN CLIENTE') + ' · EUR ' + imponibile.toFixed(2) + ' · righe ' + righe.length)
-      setDebug(testo.slice(0, 800))
+      esiti.push(numero + ' → ' + (trovato.name || 'NESSUN CLIENTE') + ' · EUR ' + imponibile.toFixed(2))
     }
     e.target.value = ''
     alert(esiti.join('\n') || 'Nessun PDF')
@@ -274,7 +240,7 @@ export default function Lista() {
         <Link to="/nuovo" className="bg-slate-900 text-white px-4 py-2 rounded-lg">+ Nuovo preventivo</Link>
       </div>
       <div className="bg-white rounded-xl shadow p-3 space-y-2">
-        <p className="text-sm font-medium">Importa PDF. Collega il cliente se nome e cognome sono in anagrafica.</p>
+        <p className="text-sm font-medium">Importa PDF originali. Salva il file così com è e collega il cliente.</p>
         <input value={cercaImport} onChange={e => setCercaImport(e.target.value)} placeholder="Opzionale: forza un cliente per tutti..." className="w-full border rounded-lg px-3 py-2 text-sm" />
         {clientiFiltrati.map(c => (
           <button key={c.id} type="button" onClick={() => { setClienteImport(c.id); setCercaImport(c.name) }} className="block text-left text-sm px-2 py-1 hover:bg-blue-50 w-full">{c.name}</button>
@@ -285,12 +251,6 @@ export default function Lista() {
           <input type="file" accept="application/pdf" multiple onChange={importaPdf} className="hidden" />
         </label>
       </div>
-      {debug ? (
-        <div className="bg-amber-50 border rounded-lg p-3 text-xs whitespace-pre-wrap">
-          <p className="font-semibold mb-1">Testo letto dal PDF (prime 800 lettere):</p>
-          {debug}
-        </div>
-      ) : null}
       <div className="flex flex-wrap gap-2 bg-white p-3 rounded-xl shadow">
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Cerca cliente o numero..." className="border rounded-lg px-3 py-2 text-sm flex-1 min-w-[160px]" />
         <select value={filtroAnno} onChange={e => setFiltroAnno(e.target.value)} className="border rounded-lg px-2 py-2 text-sm">
@@ -336,6 +296,7 @@ export default function Lista() {
               <p className="font-medium">{row.quote_number} · {row.clients?.name || 'Senza cliente'}</p>
               <p className="text-sm text-slate-500">{format(parseISO(row.created_at), 'dd MMM yyyy', { locale: it })}</p>
             </Link>
+            {String(row.notes || '').startsWith('http') ? <a href={row.notes} target="_blank" rel="noreferrer" className="text-sm border px-3 py-1 rounded-lg">Apri PDF</a> : null}
             <select value={row.status || 'non_spedito'} onChange={e => setStatus(row.id, e.target.value)} className={'text-sm border rounded-lg px-2 py-1 ' + statoClass(row.status || 'non_spedito')}>
               {STATI.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
