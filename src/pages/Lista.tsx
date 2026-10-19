@@ -18,13 +18,17 @@ function statoClass(v: string) {
   return 'bg-slate-100 text-slate-700'
 }
 
+function dataDi(r: any) {
+  const m = String(r.oggetto || '').match(/(\d{4}-\d{2}-\d{2})/)
+  return m ? m[1] : String(r.created_at || '').slice(0, 10)
+}
+
 function annoDi(r: any) {
-  const d = r.created_at || ''
-  return String(d).slice(0, 4)
+  return dataDi(r).slice(0, 4)
 }
 
 function trimestreDi(r: any) {
-  const d = new Date(r.created_at || '')
+  const d = new Date(dataDi(r))
   if (isNaN(d.getTime())) return 1
   return Math.floor(d.getMonth() / 3) + 1
 }
@@ -156,10 +160,9 @@ export default function Lista() {
       const ins = await supabase.from('quotes').insert({
         quote_number: numero,
         status: 'non_spedito',
-        oggetto: trovato.name || 'Importato da PDF',
+        oggetto: (trovato.name || 'Importato da PDF') + (data ? ' · ' + data : ''),
         notes: url,
         client_id: trovato.id,
-        created_at: data ? data + 'T12:00:00' : undefined,
       }).select().single()
       if (ins.error || !ins.data) { esiti.push(file.name + ': errore salvataggio'); continue }
       if (imponibile > 0) {
