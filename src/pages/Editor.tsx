@@ -21,6 +21,7 @@ export default function Editor() {
   const { id } = useParams()
   const navigate = useNavigate()
   const clienteFromUrl = new URLSearchParams(window.location.search).get('cliente')
+  const eNuovo = !id
 
   const [quoteId, setQuoteId] = useState<string | null>(id || null)
   const [clients, setClients] = useState<Client[]>([])
@@ -74,15 +75,23 @@ export default function Editor() {
     }
   }
 
+  async function cancellaNuovo() {
+    if (!quoteId || !eNuovo) return
+    await supabase.from('quote_items').delete().eq('quote_id', quoteId)
+    await supabase.from('quotes').delete().eq('id', quoteId)
+  }
+
   async function salvaOAbbandona() {
-    const salva = confirm('Salvare le modifiche?\nOK = salva\nAnnulla = abbandona e lascia il preventivo com era')
+    const salva = confirm('Salvare le modifiche?\nOK = salva\nAnnulla = abbandona' + (eNuovo ? ' e cancella il preventivo' : ' e lascia il preventivo com era'))
     if (!salva) {
+      if (eNuovo) await cancellaNuovo()
       setDirty(false)
       setModifica(false)
       return true
     }
     if (!clientId) {
-      alert('Senza cliente non salvo. Il preventivo resta com era.')
+      alert('Senza cliente non salvo.' + (eNuovo ? ' Il preventivo viene cancellato.' : ' Il preventivo resta com era.'))
+      if (eNuovo) await cancellaNuovo()
       setDirty(false)
       setModifica(false)
       return true
@@ -308,13 +317,11 @@ export default function Editor() {
               ))}
             </div>
           ) : null}
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={addRigaLibera} className="border px-4 py-2 rounded-lg text-sm">+ Riga libera</button>
-            <form onSubmit={addSconto} className="flex gap-2">
-              <input type="number" step="0.01" value={sconto} onChange={e => setSconto(e.target.value)} placeholder="Sconto EUR" className="border rounded-lg px-3 py-2 w-32" />
-              <button className="bg-amber-500 text-white px-4 rounded-lg text-sm">Aggiungi sconto</button>
-            </form>
-          </div>
+          <button type="button" onClick={addRigaLibera} className="text-sm border px-3 py-1 rounded-lg">+ Riga libera</button>
+          <form onSubmit={addSconto} className="flex gap-2">
+            <input value={sconto} onChange={e => setSconto(e.target.value)} placeholder="Sconto EUR" className="border rounded-lg px-2 py-1" />
+            <button className="border px-3 py-1 rounded-lg">Aggiungi sconto</button>
+          </form>
         </div>
       ) : null}
       <div className="bg-white rounded-xl shadow p-4 space-y-4">
