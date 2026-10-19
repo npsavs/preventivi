@@ -150,7 +150,7 @@ export default function Lista() {
       const ins = await supabase.from('quotes').insert({
         quote_number: numero,
         status: 'non_spedito',
-        oggetto: 'Importato da PDF',
+        oggetto: trovato.name || 'Importato da PDF',
         notes: url,
         client_id: trovato.id,
       }).select().single()
@@ -293,7 +293,7 @@ export default function Lista() {
         {filtered.map(row => (
           <div key={row.id} className="px-4 py-3 flex flex-wrap items-center gap-3">
             <Link to={'/preventivo/' + row.id} className="flex-1 min-w-[180px]">
-              <p className="font-medium">{row.quote_number} · {row.clients?.name || 'Senza cliente'}</p>
+              <p className="font-medium">{row.quote_number} · {row.clients?.name || row.oggetto || 'Senza cliente'}</p>
               <p className="text-sm text-slate-500">{format(parseISO(row.created_at), 'dd MMM yyyy', { locale: it })}</p>
             </Link>
             {String(row.notes || '').startsWith('http') ? <a href={row.notes} target="_blank" rel="noreferrer" className="text-sm border px-3 py-1 rounded-lg">Apri PDF</a> : null}
