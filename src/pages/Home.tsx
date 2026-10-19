@@ -27,22 +27,26 @@ export default function Home() {
     supabase.from('quotes').select('id, quote_number, status, created_at, oggetto, clients(name)').order('created_at', { ascending: false }).then(({ data }) => setRows(data || []))
   }, [])
 
-  const y = rows.filter(r => String(r.created_at).slice(0, 4) === String(year))
-  const n = (s: string) => y.filter(r => (r.status || 'non_spedito') === s).length
+  const anno = rows.filter(r => String(r.created_at).slice(0, 4) === String(year))
+  const n = (s: string) => anno.filter(r => (r.status || 'non_spedito') === s).length
   const cerca = q.trim().toLowerCase()
-  const visibili = rows.filter(r => {
+  const visibili = anno.filter(r => {
     if (!cerca) return true
     const nome = (r.clients && r.clients.name) || String(r.oggetto || '').split(' · ')[0] || ''
     return String(r.quote_number || '').toLowerCase().includes(cerca) || nome.toLowerCase().includes(cerca)
-  }).slice(0, 20)
+  })
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Panoramica preventivi {year}</h1>
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <Link to="/lista" className="bg-white rounded-xl shadow p-4">
-          <p className="text-xs text-slate-500">Totale anno</p>
-          <p className="text-xl font-bold">{y.length}</p>
+          <p className="text-xs text-slate-500">Totale {year}</p>
+          <p className="text-xl font-bold">{anno.length}</p>
+        </Link>
+        <Link to="/lista" className="bg-white rounded-xl shadow p-4">
+          <p className="text-xs text-slate-500">Non spediti</p>
+          <p className="text-xl font-bold">{n('non_spedito')}</p>
         </Link>
         <Link to="/lista" className="bg-white rounded-xl shadow p-4">
           <p className="text-xs text-slate-500">In attesa</p>
@@ -52,14 +56,10 @@ export default function Home() {
           <p className="text-xs text-green-700">Accettati</p>
           <p className="text-xl font-bold">{n('accettato')}</p>
         </Link>
-        <Link to="/lista" className="bg-white rounded-xl shadow p-4">
-          <p className="text-xs text-red-600">Rifiutati</p>
-          <p className="text-xl font-bold">{n('rifiutato')}</p>
-        </Link>
       </div>
       <input value={q} onChange={e => setQ(e.target.value)} placeholder="Cerca cliente o numero..." className="w-full border rounded-lg px-4 py-2" />
       <div className="bg-white rounded-xl shadow divide-y">
-        <p className="p-3 font-semibold text-sm">Ultimi</p>
+        <p className="p-3 font-semibold text-sm">Preventivi {year}</p>
         {visibili.length === 0 ? <p className="p-4 text-center text-slate-500">Nessun preventivo</p> : null}
         {visibili.map(r => {
           const nome = (r.clients && r.clients.name) || String(r.oggetto || '').split(' · ')[0] || 'Senza cliente'
