@@ -308,11 +308,13 @@ export default function Lista() {
         {filtered.map(row => (
           <div key={row.id} className="px-4 py-3 flex flex-wrap items-center gap-3">
             <Link to={'/preventivo/' + row.id} className="flex-1 min-w-[180px]">
-              <p className="font-medium">{row.quote_number} · {row.clients?.name || row.oggetto || 'Senza cliente'}</p>
-              <p className="text-sm text-slate-500">{format(parseISO(row.created_at), 'dd MMM yyyy', { locale: it })}</p>
+              <p className="font-medium">{row.quote_number}</p>
+              <p className="text-sm">{row.clients?.name || (String(row.oggetto || '').split(' · ')[0]) || 'Senza cliente'}</p>
+              <p className="text-xs text-slate-500">{format(parseISO(row.created_at), 'dd MMM yyyy', { locale: it })}</p>
             </Link>
+            <span className={'text-xs px-2 py-1 rounded ' + statoClass(row.status || 'non_spedito')}>{STATI.find(s => s.value === (row.status || 'non_spedito'))?.label}</span>
             {String(row.notes || '').startsWith('http') ? <a href={row.notes} target="_blank" rel="noreferrer" className="text-sm border px-3 py-1 rounded-lg">Apri PDF</a> : null}
-            <select value={row.status || 'non_spedito'} onChange={e => setStatus(row.id, e.target.value)} className={'text-sm border rounded-lg px-2 py-1 ' + statoClass(row.status || 'non_spedito')}>
+            <select value={row.status || 'non_spedito'} onChange={e => setStatus(row.id, e.target.value)} className="text-sm border rounded-lg px-2 py-1">
               {STATI.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
             <button type="button" onClick={() => creaFattura(row)} className="text-sm bg-slate-900 text-white px-3 py-1 rounded-lg">Crea fattura</button>
