@@ -1,17 +1,40 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { format, parseISO } from 'date-fns'
+import { it } from 'date-fns/locale'
+
+const STATI: Record<string, string> = {
+  non_spedito: 'Non spedito',
+  in_attesa: 'In attesa',
+  accettato: 'Accettato',
+  rifiutato: 'Rifiutato',
+}
+
+function statoClass(v: string) {
+  if (v === 'accettato') return 'bg-green-100 text-green-800'
+  if (v === 'rifiutato') return 'bg-red-100 text-red-800'
+  if (v === 'in_attesa') return 'bg-amber-100 text-amber-800'
+  return 'bg-slate-100 text-slate-700'
+}
 
 export default function Home() {
   const [rows, setRows] = useState<any[]>([])
+  const [q, setQ] = useState('')
   const year = new Date().getFullYear()
 
   useEffect(() => {
-    supabase.from('quotes').select('id, quote_number, status, created_at, clients(name)').order('created_at', { ascending: false }).then(({ data }) => setRows(data || []))
+    supabase.from('quotes').select('id, quote_number, status, created_at, oggetto, clients(name)').order('created_at', { ascending: false }).then(({ data }) => setRows(data || []))
   }, [])
 
   const y = rows.filter(r => String(r.created_at).slice(0, 4) === String(year))
   const n = (s: string) => y.filter(r => (r.status || 'non_spedito') === s).length
+  const cerca = q.trim().toLowerCase()
+  const visibili = rows.filter(r => {
+    if (!cerca) return true
+    const nome = (r.clients && r.clients.name) || String(r.oggetto || '').split(' · ')[0] || ''
+    return String(r.quote_number || '').toLowerCase().includes(cerca) || nome.toLowerCase().includes(cerca)
+  }).slice(0, 20)
 
   return (
     <div className="space-y-6">
@@ -34,13 +57,23 @@ export default function Home() {
           <p className="text-xl font-bold">{n('rifiutato')}</p>
         </Link>
       </div>
+      <input value={q} onChange={e => setQ(e.target.value)} placeholder="Cerca cliente o numero..." className="w-full border rounded-lg px-4 py-2" />
       <div className="bg-white rounded-xl shadow divide-y">
         <p className="p-3 font-semibold text-sm">Ultimi</p>
-        {rows.slice(0, 8).map(r => (
-          <Link key={r.id} to={'/preventivo/' + r.id} className="block px-4 py-2 text-sm hover:bg-slate-50">
-            {r.quote_number} · {(r.clients && r.clients.name) || ''}
-          </Link>
-        ))}
+        {visibili.length === 0 ? <p className="p-4 text-center text-slate-500">Nessun preventivo</p> : null}
+        {visibili.map(r => {
+          const nome = (r.clients && r.clients.name) || String(r.oggetto || '').split(' · ')[0] || 'Senza cliente'
+          const stato = r.status || 'non_spedito'
+          return (
+            <Link key={r.id} to={'/preventivo/' + r.id} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50">
+              <div className="flex-1 min-w-0">
+                <p className="font-medium truncate">{r.quote_number} · {nome}</p>
+                <p className="text-xs text-slate-500">{format(parseISO(r.created_at), 'dd MMM yyyy', { locale: it })}</p>
+              </div>
+              <span className={'text-xs px-2 py-1 rounded ' + statoClass(stato)}>{STATI[stato] || stato}</span>
+            </Link>
+          )
+        })}
       </div>
     </div>
   )
