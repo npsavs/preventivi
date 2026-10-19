@@ -19,11 +19,13 @@ function statoClass(v: string) {
 }
 
 function annoDi(r: any) {
-  return String(r.created_at || '').slice(0, 4)
+  const d = r.created_at || ''
+  return String(d).slice(0, 4)
 }
 
 function trimestreDi(r: any) {
-  const d = new Date(r.created_at)
+  const d = new Date(r.created_at || '')
+  if (isNaN(d.getTime())) return 1
   return Math.floor(d.getMonth() / 3) + 1
 }
 
@@ -37,9 +39,12 @@ function numeroIt(v: string) {
   return Number.isFinite(n) ? n : 0
 }
 
-function numeroPreventivo(testo: string, nomeFile: string) {
-  const m = testo.match(/(\d{1,5}\/\d{4})/)
-  return m ? m[1] : nomeFile.replace(/\.pdf$/i, '')
+function dataPreventivo(testo: string) {
+  const m = testo.match(/del\s+(\d{1,2})[\/.](\d{1,2})[\/.](\d{4})/i)
+  if (!m) return null
+  const giorno = m[1].padStart(2, '0')
+  const mese = m[2].padStart(2, '0')
+  return m[3] + '-' + mese + '-' + giorno
 }
 
 function imponibileDaTesto(testo: string) {
@@ -141,6 +146,7 @@ export default function Lista() {
       let testo = ''
       try { testo = await testoPdf(file) } catch { testo = '' }
       const numero = numeroPreventivo(testo, file.name)
+      const data = dataPreventivo(testo)
       const trovato = trovaCliente(testo, clients, clienteImport)
       const imponibile = imponibileDaTesto(testo)
       const path = 'preventivi/' + Date.now() + '-' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
@@ -153,6 +159,7 @@ export default function Lista() {
         oggetto: trovato.name || 'Importato da PDF',
         notes: url,
         client_id: trovato.id,
+        created_at: data ? data + 'T12:00:00' : undefined,
       }).select().single()
       if (ins.error || !ins.data) { esiti.push(file.name + ': errore salvataggio'); continue }
       if (imponibile > 0) {
