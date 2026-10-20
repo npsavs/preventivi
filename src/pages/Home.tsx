@@ -18,6 +18,11 @@ function statoClass(v: string) {
   return 'bg-slate-100 text-slate-700'
 }
 
+function dataDi(r: any) {
+  const m = String(r.oggetto || '').match(/(\d{4}-\d{2}-\d{2})/)
+  return m ? m[1] : String(r.created_at || '').slice(0, 10)
+}
+
 export default function Home() {
   const [rows, setRows] = useState<any[]>([])
   const [q, setQ] = useState('')
@@ -27,7 +32,7 @@ export default function Home() {
     supabase.from('quotes').select('id, quote_number, status, created_at, oggetto, clients(name)').order('created_at', { ascending: false }).then(({ data }) => setRows(data || []))
   }, [])
 
-  const anno = rows.filter(r => String(r.created_at).slice(0, 4) === String(year))
+  const anno = rows.filter(r => dataDi(r).slice(0, 4) === String(year))
   const n = (s: string) => anno.filter(r => (r.status || 'non_spedito') === s).length
   const cerca = q.trim().toLowerCase()
   const visibili = anno.filter(r => {
@@ -68,7 +73,7 @@ export default function Home() {
             <Link key={r.id} to={'/preventivo/' + r.id} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50">
               <div className="flex-1 min-w-0">
                 <p className="font-medium truncate">{r.quote_number} · {nome}</p>
-                <p className="text-xs text-slate-500">{format(parseISO(r.created_at), 'dd MMM yyyy', { locale: it })}</p>
+                <p className="text-xs text-slate-500">{format(parseISO(dataDi(r)), 'dd MMM yyyy', { locale: it })}</p>
               </div>
               <span className={'text-xs px-2 py-1 rounded ' + statoClass(stato)}>{STATI[stato] || stato}</span>
             </Link>
