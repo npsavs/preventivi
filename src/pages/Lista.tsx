@@ -127,10 +127,18 @@ export default function Lista() {
   async function load() {
     const { data } = await supabase.from('quotes').select('*, clients(name)').order('created_at', { ascending: false })
     const { data: it } = await supabase.from('quote_items').select('quote_id, quantity, unit_price, name, description')
-    const { data: cl } = await supabase.from('clients').select('id, name').order('name')
+    const tutti: any[] = []
+    let start = 0
+    while (true) {
+      const { data: cl } = await supabase.from('clients').select('id, name').order('name').range(start, start + 999)
+      if (!cl || cl.length === 0) break
+      tutti.push(...cl)
+      if (cl.length < 1000) break
+      start += 1000
+    }
     setQuotes(data || [])
     setItemsAll(it || [])
-    setClients(cl || [])
+    setClients(tutti)
     setLoading(false)
   }
 
