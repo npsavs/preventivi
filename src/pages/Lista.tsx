@@ -243,6 +243,11 @@ export default function Lista() {
     }
   }, [quotes, itemsAll, filtered, trim])
 
+  const anniPresenti = [...new Set(quotes.map(r => annoDi(r)).filter(a => a && a.length === 4))].sort()
+  const annoMax = Math.max(new Date().getFullYear() + 2, ...anniPresenti.map(Number))
+  const annoMin = Math.min(2020, ...anniPresenti.map(Number))
+  const anni = []
+  for (let a = annoMin; a <= annoMax; a++) anni.push(String(a))
   const nomeFiltro = STATI.find(s => s.value === filtro)?.label || 'Tutti'
   const clientiFiltrati = cercaImport.trim().length < 2 ? [] : clients.filter(c => c.name.toLowerCase().includes(cercaImport.toLowerCase())).slice(0, 8)
   const clienteScelto = clients.find(c => c.id === clienteImport)
@@ -270,8 +275,7 @@ export default function Lista() {
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Cerca cliente o numero..." className="border rounded-lg px-3 py-2 text-sm flex-1 min-w-[160px]" />
         <select value={filtroAnno} onChange={e => setFiltroAnno(e.target.value)} className="border rounded-lg px-2 py-2 text-sm">
           <option value="">Tutti gli anni</option>
-          <option value="2026">2026</option>
-          <option value="2025">2025</option>
+          {anni.map(a => <option key={a} value={a}>{a}</option>)}
         </select>
         {[1, 2, 3, 4].map(t => (
           <button key={t} type="button" onClick={() => setTrim(t)} className={'px-3 py-2 rounded-lg text-sm ' + (trim === t ? 'bg-blue-700 text-white' : 'border')}>T{t}</button>
@@ -310,7 +314,7 @@ export default function Lista() {
             <Link to={'/preventivo/' + row.id} className="flex-1 min-w-[180px]">
               <p className="font-medium">{row.quote_number}</p>
               <p className="text-sm">{row.clients?.name || (String(row.oggetto || '').split(' · ')[0]) || 'Senza cliente'}</p>
-              <p className="text-xs text-slate-500">{format(parseISO(row.created_at), 'dd MMM yyyy', { locale: it })}</p>
+              <p className="text-xs text-slate-500">{format(parseISO(dataDi(row)), 'dd MMM yyyy', { locale: it })}</p>
             </Link>
             <span className={'text-xs px-2 py-1 rounded ' + statoClass(row.status || 'non_spedito')}>{STATI.find(s => s.value === (row.status || 'non_spedito'))?.label}</span>
             {String(row.notes || '').startsWith('http') ? <a href={row.notes} target="_blank" rel="noreferrer" className="text-sm border px-3 py-1 rounded-lg">Apri PDF</a> : null}
