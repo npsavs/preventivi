@@ -152,13 +152,6 @@ export default function Lista() {
     load()
   }
 
-      esiti.push(numero + ' → ' + (trovato.name || 'NESSUN CLIENTE') + ' · EUR ' + imponibile.toFixed(2))
-    }
-    e.target.value = ''
-    alert(esiti.join('\n') || 'Nessun PDF')
-    load()
-  }
-
   async function creaFattura(row: any) {
     if (!row.client_id) return alert('Manca il cliente in anagrafica')
     if (!confirm('Creare una fattura dalle righe di ' + row.quote_number + '?')) return
