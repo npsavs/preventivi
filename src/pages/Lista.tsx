@@ -189,7 +189,8 @@ export default function Lista() {
   const cerca = q.trim().toLowerCase()
   const annoCorrente = String(new Date().getFullYear())
   const filtered = quotes.filter(row => {
-    if (cerca && !(String(row.quote_number || '').toLowerCase().includes(cerca) || String(row.clients?.name || '').toLowerCase().includes(cerca))) return false
+    const testo = (String(row.quote_number || '') + ' ' + String(row.clients?.name || '') + ' ' + String(row.oggetto || '')).toLowerCase()
+    if (cerca && !testo.includes(cerca)) return false
     if (filtroAnno && annoDi(row) !== filtroAnno) return false
     if (filtro !== 'tutti' && (row.status || 'non_spedito') !== filtro) return false
     return true
