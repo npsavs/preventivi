@@ -14,6 +14,7 @@ export default function Layout() {
           <nav className="flex flex-wrap gap-3 text-sm">
             <NavLink to="/" end className={item}>Panoramica</NavLink>
             <NavLink to="/lista" className={item}>Preventivi</NavLink>
+            <NavLink to="/importa" className={item}>Importa PDF</NavLink>
             <NavLink to="/clienti" className={item}>Clienti</NavLink>
             <NavLink to="/catalogo" className={item}>Materiali</NavLink>
             <NavLink to="/nuovo" className={item}>+ Nuovo</NavLink>

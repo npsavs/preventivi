@@ -10,6 +10,7 @@ import Catalogo from './pages/Catalogo'
 import Editor from './pages/Editor'
 import Stampa from './pages/Stampa'
 import Clienti from './pages/Clienti'
+import ImportaPdf from './pages/ImportaPdf'
 
 export default function App() {
   const [session, setSession] = useState<any>(null)
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="/" element={session ? <Layout /> : <Navigate to="/login" />}>
           <Route index element={<Home />} />
           <Route path="lista" element={<Lista />} />
+          <Route path="importa" element={<ImportaPdf />} />
           <Route path="catalogo" element={<Catalogo />} />
           <Route path="clienti" element={<Clienti />} />
           <Route path="nuovo" element={<Editor />} />

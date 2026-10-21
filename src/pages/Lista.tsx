@@ -119,9 +119,7 @@ export default function Lista() {
   const [filtro, setFiltro] = useState('tutti')
   const [filtroAnno, setFiltroAnno] = useState(String(new Date().getFullYear()))
   const [trim, setTrim] = useState(Math.floor(new Date().getMonth() / 3) + 1)
-  const [clienteImport, setClienteImport] = useState('')
-  const [cercaImport, setCercaImport] = useState('')
-
+  
   useEffect(() => { load() }, [])
 
   async function load() {
@@ -154,39 +152,6 @@ export default function Lista() {
     load()
   }
 
-  async function importaPdf(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files
-    if (!files || files.length === 0) return
-    const esiti: string[] = []
-    for (const file of Array.from(files)) {
-      if (!file.name.toLowerCase().endsWith('.pdf')) continue
-      let testo = ''
-      try { testo = await testoPdf(file) } catch { testo = '' }
-      const numero = numeroPreventivo(testo, file.name)
-      const data = dataPreventivo(testo)
-      const trovato = trovaCliente(testo, clients, clienteImport)
-      const imponibile = imponibileDaTesto(testo)
-      const path = 'preventivi/' + Date.now() + '-' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-      const up = await supabase.storage.from('prodotti').upload(path, file, { contentType: 'application/pdf', upsert: true })
-      if (up.error) { esiti.push(file.name + ': PDF non caricato (' + up.error.message + ')'); continue }
-      const url = supabase.storage.from('prodotti').getPublicUrl(path).data.publicUrl
-      const ins = await supabase.from('quotes').insert({
-        quote_number: numero,
-        status: 'non_spedito',
-        oggetto: (trovato.name || 'Importato da PDF') + (data ? ' · ' + data : ''),
-        notes: url,
-        client_id: trovato.id,
-      }).select().single()
-      if (ins.error || !ins.data) { esiti.push(file.name + ': errore salvataggio'); continue }
-      if (imponibile > 0) {
-        await supabase.from('quote_items').insert({
-          quote_id: ins.data.id,
-          name: 'Imponibile importato da PDF',
-          description: 'Solo per le statistiche',
-          quantity: 1,
-          unit_price: imponibile,
-        })
-      }
       esiti.push(numero + ' → ' + (trovato.name || 'NESSUN CLIENTE') + ' · EUR ' + imponibile.toFixed(2))
     }
     e.target.value = ''
@@ -257,8 +222,6 @@ export default function Lista() {
   const anni = []
   for (let a = annoMin; a <= annoMax; a++) anni.push(String(a))
   const nomeFiltro = STATI.find(s => s.value === filtro)?.label || 'Tutti'
-  const clientiFiltrati = cercaImport.trim().length < 2 ? [] : clients.filter(c => c.name.toLowerCase().includes(cercaImport.toLowerCase())).slice(0, 8)
-  const clienteScelto = clients.find(c => c.id === clienteImport)
   if (loading) return <div className="text-center py-10">Caricamento...</div>
 
   return (
@@ -267,18 +230,7 @@ export default function Lista() {
         <h1 className="text-2xl font-bold">Preventivi</h1>
         <Link to="/nuovo" className="bg-slate-900 text-white px-4 py-2 rounded-lg">+ Nuovo preventivo</Link>
       </div>
-      <div className="bg-white rounded-xl shadow p-3 space-y-2">
-        <p className="text-sm font-medium">Importa PDF originali. Salva il file così com è e collega il cliente.</p>
-        <input value={cercaImport} onChange={e => setCercaImport(e.target.value)} placeholder="Opzionale: forza un cliente per tutti..." className="w-full border rounded-lg px-3 py-2 text-sm" />
-        {clientiFiltrati.map(c => (
-          <button key={c.id} type="button" onClick={() => { setClienteImport(c.id); setCercaImport(c.name) }} className="block text-left text-sm px-2 py-1 hover:bg-blue-50 w-full">{c.name}</button>
-        ))}
-        {clienteScelto ? <p className="text-sm text-green-700">Cliente forzato: {clienteScelto.name}</p> : null}
-        <label className="inline-block border px-4 py-2 rounded-lg bg-white cursor-pointer">
-          Importa PDF
-          <input type="file" accept="application/pdf" multiple onChange={importaPdf} className="hidden" />
-        </label>
-      </div>
+      
       <div className="flex flex-wrap gap-2 bg-white p-3 rounded-xl shadow">
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Cerca cliente o numero..." className="border rounded-lg px-3 py-2 text-sm flex-1 min-w-[160px]" />
         <select value={filtroAnno} onChange={e => setFiltroAnno(e.target.value)} className="border rounded-lg px-2 py-2 text-sm">
