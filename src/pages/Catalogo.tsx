@@ -20,12 +20,16 @@ export default function Catalogo() {
     setMaterials((m || []) as Material[])
   }
 
-  async function addCategory(e: any) {
-    e.preventDefault()
-    if (!newCat.trim()) return
-    const { error } = await supabase.from('categories').insert({ name: newCat.trim() })
+  async function addCategory() {
+    const nome = prompt('Nome della nuova categoria')
+    if (!nome || !nome.trim()) return
+    const { error } = await supabase.from('categories').insert({ name: nome.trim() })
     if (error) return alert(error.message)
-    setNewCat('')
+    load()
+  }
+
+  async function cambiaCategoria(matId: string, catId: string) {
+    await supabase.from('materials').update({ category_id: catId }).eq('id', matId)
     load()
   }
 
@@ -62,7 +66,10 @@ export default function Catalogo() {
     <div className="space-y-6">
       <div className="flex flex-wrap justify-between gap-2">
         <h1 className="text-2xl font-bold">Catalogo materiali</h1>
-        <Link to="/materiale/nuovo" className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">+ Nuovo prodotto</Link>
+        <div className="flex gap-2">
+          <button type="button" onClick={addCategory} className="border px-4 py-2 rounded-lg text-sm">+ Categoria</button>
+          <Link to={'/materiale/nuovo' + (catId ? '?cat=' + catId : '')} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">+ Nuovo prodotto</Link>
+        </div>
       </div>
       {msg ? <p className="text-green-700 text-sm">{msg}</p> : null}
 
@@ -73,11 +80,6 @@ export default function Catalogo() {
           <button key={c.id} type="button" onClick={() => setCatId(c.id)} className={'px-3 py-2 rounded-lg text-sm ' + (catId === c.id ? 'bg-slate-900 text-white' : 'border')}>{c.name}</button>
         ))}
       </div>
-
-      <form onSubmit={addCategory} className="bg-white p-4 rounded-xl shadow flex gap-3">
-        <input value={newCat} onChange={e => setNewCat(e.target.value)} placeholder="Nuova categoria" className="flex-1 border rounded-lg px-3 py-2" />
-        <button type="submit" className="bg-slate-900 text-white px-4 py-2 rounded-lg">Aggiungi categoria</button>
-      </form>
 
       {cats.map(cat => (
         <div key={cat.id} className="bg-white rounded-xl shadow p-4 space-y-3">
@@ -97,6 +99,9 @@ export default function Catalogo() {
               </div>
               <div className="flex gap-3">
                 <Link to={'/materiale/' + m.id} className="text-blue-600">Modifica</Link>
+                <select value={m.category_id} onChange={e => cambiaCategoria(m.id, e.target.value)} className="text-xs border rounded px-1">
+                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
                 <button type="button" onClick={() => deleteMaterial(m.id)} className="text-red-600">Elimina</button>
               </div>
             </div>

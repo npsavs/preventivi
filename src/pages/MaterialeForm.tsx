@@ -15,6 +15,8 @@ export default function MaterialeForm() {
     image_url: '',
   })
 
+  const catFromUrl = new URLSearchParams(window.location.search).get('cat')
+
   useEffect(() => { start() }, [id])
 
   async function start() {
@@ -32,6 +34,8 @@ export default function MaterialeForm() {
           image_url: data.image_url || '',
         })
       }
+    } else if (catFromUrl) {
+      setForm(f => ({ ...f, category_id: catFromUrl }))
     } else if (c && c[0]) {
       setForm(f => ({ ...f, category_id: f.category_id || c[0].id }))
     }
