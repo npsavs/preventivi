@@ -165,6 +165,7 @@ async function start() {
   async function saveHeader() {
     if (!quoteId) return
     if (!clientId) return alert('Seleziona il cliente in anagrafica prima di salvare')
+    if (!confirm('Confermi le modifiche al preventivo?')) return
     await scriviRighe()
     const { error } = await supabase.from('quotes').update({
       client_id: clientId,
@@ -358,7 +359,6 @@ async function start() {
             updateItem(item.id, { unit_price: prezzo, description: desc })
           }
           function cambiaOriginale(nuovo: number) {
-            if (!confirm('Modificare il prezzo originale da EUR ' + prezzoOriginale.toFixed(2) + ' a EUR ' + nuovo.toFixed(2) + '?')) return
             const prezzo = nuovo * (1 - sconto / 100)
             const desc = descPulita + (sconto > 0 ? ' |PREZZO_ORIGINALE:' + nuovo + '|SCONTO:' + sconto : '')
             updateItem(item.id, { unit_price: prezzo, description: desc })
