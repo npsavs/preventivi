@@ -318,21 +318,12 @@ async function start() {
         <label className="block text-sm font-medium">Note in fondo</label>
         <textarea value={footerNotes} disabled={!modifica} onChange={e => { setFooterNotes(e.target.value); setDirty(true) }} className="w-full border rounded-lg px-3 py-2" rows={4} />
       </div>
-      {modifica ? (
+      {modifica && quoteId ? (
         <div className="bg-white rounded-xl shadow p-4 space-y-3">
-          <h2 className="font-semibold">Aggiungi una riga</h2>
-          <input value={searchProd} onChange={e => setSearchProd(e.target.value)} placeholder="Cerca prodotto (almeno 2 lettere)..." className="w-full border rounded-lg px-3 py-2" />
-          {foundProducts.length > 0 ? (
-            <div className="border rounded-lg divide-y">
-              {foundProducts.map(m => (
-                <button key={m.id} type="button" onClick={() => addMaterial(m)} className="flex justify-between w-full px-3 py-2 text-sm text-left">
-                  <span>{m.name}</span><span>EUR {Number(m.unit_price).toFixed(2)}</span>
-                </button>
-              ))}
-            </div>
-          ) : null}
-          <button type="button" onClick={addRigaLibera} className="text-sm border px-3 py-1 rounded-lg">+ Riga libera</button>
-          <form onSubmit={addSconto} className="flex gap-2">
+          <h2 className="font-semibold">Aggiungi prodotti</h2>
+          <Link to={'/preventivo/' + quoteId + '/materiali'} className="inline-block bg-slate-900 text-white px-4 py-2 rounded-lg">Aggiungi prodotti</Link>
+          <button type="button" onClick={addRigaLibera} className="text-sm border px-3 py-1 rounded-lg ml-2">+ Riga libera</button>
+          <form onSubmit={addSconto} className="flex gap-2 mt-2">
             <input value={sconto} onChange={e => setSconto(e.target.value)} placeholder="Sconto EUR" className="border rounded-lg px-2 py-1" />
             <button className="border px-3 py-1 rounded-lg">Aggiungi sconto</button>
           </form>
