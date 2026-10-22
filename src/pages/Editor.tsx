@@ -66,6 +66,7 @@ export default function Editor() {
 
   async function scriviRighe() {
     for (const item of items) {
+      if (item.name === 'Nuova riga' && Number(item.unit_price) === 0) continue
       await supabase.from('quote_items').update({
         name: item.name,
         description: item.description,
