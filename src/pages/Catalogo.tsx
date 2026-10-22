@@ -99,9 +99,6 @@ export default function Catalogo() {
               </div>
               <div className="flex gap-3">
                 <Link to={'/materiale/' + m.id} className="text-blue-600">Modifica</Link>
-                <select value={m.category_id} onChange={e => cambiaCategoria(m.id, e.target.value)} className="text-xs border rounded px-1">
-                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
                 <button type="button" onClick={() => deleteMaterial(m.id)} className="text-red-600">Elimina</button>
               </div>
             </div>
