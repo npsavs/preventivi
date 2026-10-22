@@ -104,9 +104,10 @@ export default function Stampa() {
           <img src="/logo.png" alt="NPS" className="h-[110px] w-[110px] object-contain" />
           <div className="text-right text-[11px] leading-5">
             <p className="font-semibold">Nuovo Punto Sicurezza snc</p>
-            <p>Via Claudia 50</p>
+            <p>Via Claudia 48A</p>
             <p>00062 - Bracciano (RM) - Italy</p>
             <p>P.IVA 05678201004</p>
+            <p>Tel: 3386379818 / 3386379820</p>
           </div>
         </header>
 
@@ -143,14 +144,27 @@ export default function Stampa() {
             {items.map(row => {
               const qty = Math.round(Number(row.quantity))
               const tot = qty * Number(row.unit_price)
+              const m = String(row.description || '').match(/\|PREZZO_ORIGINALE:([\d.]+)\|SCONTO:(\d+)/)
+              const prezzoOriginale = m ? Number(m[1]) : null
+              const sconto = m ? Number(m[2]) : 0
+              const descPulita = String(row.description || '').replace(/ \|PREZZO_ORIGINALE:[\d.]+\|SCONTO:\d+/, '')
               return (
                 <tr key={row.id} className="border-b border-neutral-200 align-top">
                   <td className="py-3 pr-3 leading-4">
                     <span className="font-medium">{row.name}</span>
-                    {row.description && <div className="text-[10px] text-neutral-500 mt-1">{row.description}</div>}
+                    {descPulita && <div className="text-[10px] text-neutral-500 mt-1">{descPulita}</div>}
                   </td>
                   <td className="py-3 text-center">{qty}</td>
-                  <td className="py-3 text-right">{Number(row.unit_price).toLocaleString('it-IT', { minimumFractionDigits: 2 })} €</td>
+                  <td className="py-3 text-right">
+                    {prezzoOriginale && sconto > 0 ? (
+                      <div>
+                        <span className="line-through text-neutral-400 text-[10px]">{prezzoOriginale.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €</span>
+                        <div className="text-red-600 font-medium">{Number(row.unit_price).toLocaleString('it-IT', { minimumFractionDigits: 2 })} €</div>
+                      </div>
+                    ) : (
+                      Number(row.unit_price).toLocaleString('it-IT', { minimumFractionDigits: 2 }) + ' €'
+                    )}
+                  </td>
                   <td className="py-3 text-right">{tot.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €</td>
                   <td className="py-3 text-center">22.0 %</td>
                   <td className="py-3 text-center">

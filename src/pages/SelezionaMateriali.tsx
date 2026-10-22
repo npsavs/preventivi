@@ -45,8 +45,8 @@ export default function SelezionaMateriali() {
       await supabase.from('quote_items').insert({
         quote_id: id,
         material_id: m.id,
-        name: m.name + (opts.sconto > 0 ? ' (sconto ' + opts.sconto + '%)' : ''),
-        description: m.description,
+        name: m.name,
+        description: (m.description || '') + (opts.sconto > 0 ? ' |PREZZO_ORIGINALE:' + m.unit_price + '|SCONTO:' + opts.sconto : ''),
         image_url: m.image_url,
         quantity: opts.qty,
         unit: m.unit,
