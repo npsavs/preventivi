@@ -101,13 +101,22 @@ export default function Stampa() {
 
       <article id="foglio-preventivo" className="bg-white w-[210mm] min-h-[297mm] mx-auto px-12 py-10 text-[12px] text-neutral-800 print:w-auto">
         <header className="flex justify-between items-start">
-          <img src="/logo.png" alt="NPS" className="h-[110px] w-[110px] object-contain" />
+          <div className="flex items-start gap-4">
+            <img src="/logo.png" alt="NPS" className="h-[80px] w-[80px] object-contain" />
+            <div className="text-[11px] leading-5">
+              <p className="font-semibold">Nuovo Punto Sicurezza snc</p>
+              <p>Via Claudia 48A</p>
+              <p>00062 - Bracciano (RM) - Italy</p>
+              <p>P.IVA 05678201004</p>
+              <p>Tel: 3386379818 / 3386379820</p>
+            </div>
+          </div>
           <div className="text-right text-[11px] leading-5">
-            <p className="font-semibold">Nuovo Punto Sicurezza snc</p>
-            <p>Via Claudia 48A</p>
-            <p>00062 - Bracciano (RM) - Italy</p>
-            <p>P.IVA 05678201004</p>
-            <p>Tel: 3386379818 / 3386379820</p>
+            <p className="text-[10px] tracking-[0.2em] text-neutral-500 mb-1">DESTINATARIO</p>
+            <p className="font-semibold uppercase">{client?.name || 'CLIENTE'}</p>
+            {address && <p>{address}</p>}
+            {client?.phone && <p>{client.phone}</p>}
+            {client?.email && <p>{client.email}</p>}
           </div>
         </header>
 
@@ -115,14 +124,6 @@ export default function Stampa() {
           PREVENTIVO Nr. {quote.quote_number} del {format(dataPrev, 'dd/MM/yyyy')}
         </p>
         <div className="border-t border-neutral-300" />
-
-        <div className="text-right mt-8 mb-8 leading-5">
-          <p className="text-[10px] tracking-[0.2em] text-neutral-500 mb-1">DESTINATARIO</p>
-          <p className="font-semibold uppercase">{client?.name || 'CLIENTE'}</p>
-          {address && <p>{address}</p>}
-          {client?.phone && <p>{client.phone}</p>}
-          {client?.email && <p>{client.email}</p>}
-        </div>
 
         <p className="mb-6 leading-5">
           <span className="font-semibold">Oggetto: </span>

@@ -346,27 +346,49 @@ async function start() {
       ) : null}
       <div className="bg-white rounded-xl shadow p-4 space-y-4">
         <h2 className="font-semibold">Righe del preventivo</h2>
-        {items.map((item, idx) => (
-          <div key={item.id} className="border rounded-xl p-3 space-y-2">
-            <div className="flex justify-between text-xs text-slate-500">
-              <span>Riga {idx + 1}</span>
-              {modifica ? <button type="button" onClick={() => removeItem(item.id)} className="text-red-600">Elimina riga</button> : null}
+        {items.map((item, idx) => {
+          const m = String(item.description || '').match(/\|PREZZO_ORIGINALE:([\d.]+)\|SCONTO:(\d+)/)
+          const prezzoOriginale = m ? Number(m[1]) : Number(item.unit_price)
+          const sconto = m ? Number(m[2]) : 0
+          const descPulita = String(item.description || '').replace(/ \|PREZZO_ORIGINALE:[\d.]+\|SCONTO:\d+/, '')
+          function cambiaSconto(nuovo: number) {
+            const s = Math.max(0, Math.min(100, nuovo))
+            const prezzo = prezzoOriginale * (1 - s / 100)
+            const desc = descPulita + (s > 0 ? ' |PREZZO_ORIGINALE:' + prezzoOriginale + '|SCONTO:' + s : '')
+            updateItem(item.id, { unit_price: prezzo, description: desc })
+          }
+          function cambiaOriginale(nuovo: number) {
+            if (!confirm('Modificare il prezzo originale da EUR ' + prezzoOriginale.toFixed(2) + ' a EUR ' + nuovo.toFixed(2) + '?')) return
+            const prezzo = nuovo * (1 - sconto / 100)
+            const desc = descPulita + (sconto > 0 ? ' |PREZZO_ORIGINALE:' + nuovo + '|SCONTO:' + sconto : '')
+            updateItem(item.id, { unit_price: prezzo, description: desc })
+          }
+          return (
+            <div key={item.id} className="border rounded-xl p-3 space-y-2">
+              <div className="flex justify-between text-xs text-slate-500">
+                <span>Riga {idx + 1}</span>
+                {modifica ? <button type="button" onClick={() => removeItem(item.id)} className="text-red-600">Elimina riga</button> : null}
+              </div>
+              <input value={item.name} disabled={!modifica} onChange={e => updateItem(item.id, { name: e.target.value })} className="w-full border rounded-lg px-3 py-2 font-medium" />
+              <textarea value={descPulita} disabled={!modifica} onChange={e => updateItem(item.id, { description: e.target.value + (sconto > 0 ? ' |PREZZO_ORIGINALE:' + prezzoOriginale + '|SCONTO:' + sconto : '') })} className="w-full border rounded-lg px-3 py-2" rows={2} />
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                {!item.is_discount ? (
+                  <>
+                    <button type="button" disabled={!modifica} onClick={() => updateItem(item.id, { quantity: Math.max(1, Math.round(Number(item.quantity)) - 1) })} className="w-8 h-8 border rounded">-</button>
+                    <span className="w-8 text-center">{Math.round(Number(item.quantity))}</span>
+                    <button type="button" disabled={!modifica} onClick={() => updateItem(item.id, { quantity: Math.round(Number(item.quantity)) + 1 })} className="w-8 h-8 border rounded">+</button>
+                  </>
+                ) : null}
+                <span className="text-slate-500">Prezzo originale</span>
+                <input type="number" step="0.01" disabled={!modifica} value={prezzoOriginale} onChange={e => cambiaOriginale(Number(e.target.value))} className="w-24 border rounded-lg px-2 py-1" />
+                <span className="text-slate-500">Sconto %</span>
+                <input type="number" min="0" max="100" disabled={!modifica} value={sconto} onChange={e => cambiaSconto(Number(e.target.value))} className="w-16 border rounded-lg px-2 py-1" />
+                {sconto > 0 ? <span className="text-red-600">EUR {Number(item.unit_price).toFixed(2)}</span> : null}
+                <span className="ml-auto font-medium">EUR {(Math.round(Number(item.quantity)) * Number(item.unit_price)).toFixed(2)}</span>
+              </div>
             </div>
-            <input value={item.name} disabled={!modifica} onChange={e => updateItem(item.id, { name: e.target.value })} className="w-full border rounded-lg px-3 py-2 font-medium" />
-            <textarea value={item.description || ''} disabled={!modifica} onChange={e => updateItem(item.id, { description: e.target.value })} className="w-full border rounded-lg px-3 py-2" rows={2} />
-            <div className="flex items-center gap-2">
-              {!item.is_discount ? (
-                <>
-                  <button type="button" disabled={!modifica} onClick={() => updateItem(item.id, { quantity: Math.max(1, Math.round(Number(item.quantity)) - 1) })} className="w-8 h-8 border rounded">-</button>
-                  <span className="w-8 text-center">{Math.round(Number(item.quantity))}</span>
-                  <button type="button" disabled={!modifica} onClick={() => updateItem(item.id, { quantity: Math.round(Number(item.quantity)) + 1 })} className="w-8 h-8 border rounded">+</button>
-                </>
-              ) : null}
-              <input type="number" step="0.01" disabled={!modifica} value={item.unit_price} onChange={e => updateItem(item.id, { unit_price: Number(e.target.value) })} className="w-28 border rounded-lg px-2 py-1" />
-              <span className="ml-auto font-medium">EUR {(Math.round(Number(item.quantity)) * Number(item.unit_price)).toFixed(2)}</span>
-            </div>
-          </div>
-        ))}
+          )
+        })}
         <p className="text-right text-xl font-bold">Imponibile EUR {total.toFixed(2)}</p>
       </div>
       {modifica ? <button type="button" onClick={saveHeader} className="border px-4 py-2 rounded-lg bg-white">Salva</button> : null}
