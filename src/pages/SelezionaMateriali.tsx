@@ -7,13 +7,16 @@ export default function SelezionaMateriali() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [categories, setCategories] = useState<Category[]>([])
+  const [subcategories, setSubcategories] = useState<any[]>([])
   const [materials, setMaterials] = useState<Material[]>([])
   const [q, setQ] = useState('')
   const [catId, setCatId] = useState('')
+  const [subId, setSubId] = useState('')
   const [sel, setSel] = useState<Record<string, { qty: number; sconto: number }>>({})
 
   useEffect(() => {
     supabase.from('categories').select('*').order('name').then(({ data }) => setCategories(data || []))
+    supabase.from('subcategories').select('*').order('sort_order').then(({ data }) => setSubcategories(data || []))
     supabase.from('materials').select('*').order('name').then(({ data }) => setMaterials(data || []))
   }, [])
 
@@ -59,10 +62,12 @@ export default function SelezionaMateriali() {
 
   const visibili = materials.filter(m => {
     if (catId && m.category_id !== catId) return false
+    if (subId && (m as any).subcategory_id !== subId) return false
     const t = q.toLowerCase()
     if (t && !m.name.toLowerCase().includes(t) && !(m.description || '').toLowerCase().includes(t)) return false
     return true
   })
+  const subsVisibili = subcategories.filter(s => !catId || s.category_id === catId)
 
   return (
     <div className="space-y-4">
@@ -72,11 +77,19 @@ export default function SelezionaMateriali() {
       </div>
       <div className="flex flex-wrap gap-2 bg-white p-3 rounded-xl shadow">
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Cerca prodotto..." className="border rounded-lg px-3 py-2 text-sm flex-1 min-w-[160px]" />
-        <button type="button" onClick={() => setCatId('')} className={'px-3 py-2 rounded-lg text-sm ' + (!catId ? 'bg-slate-900 text-white' : 'border')}>Tutte</button>
+        <button type="button" onClick={() => { setCatId(''); setSubId('') }} className={'px-3 py-2 rounded-lg text-sm ' + (!catId ? 'bg-slate-900 text-white' : 'border')}>Tutte</button>
         {categories.map(c => (
-          <button key={c.id} type="button" onClick={() => setCatId(c.id)} className={'px-3 py-2 rounded-lg text-sm ' + (catId === c.id ? 'bg-slate-900 text-white' : 'border')}>{c.name}</button>
+          <button key={c.id} type="button" onClick={() => { setCatId(c.id); setSubId('') }} className={'px-3 py-2 rounded-lg text-sm ' + (catId === c.id ? 'bg-slate-900 text-white' : 'border')}>{c.name}</button>
         ))}
       </div>
+      {catId && subsVisibili.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => setSubId('')} className={'px-3 py-1 rounded-lg text-xs ' + (!subId ? 'bg-slate-700 text-white' : 'border')}>Tutte le sottocategorie</button>
+          {subsVisibili.map(s => (
+            <button key={s.id} type="button" onClick={() => setSubId(s.id)} className={'px-3 py-1 rounded-lg text-xs ' + (subId === s.id ? 'bg-slate-700 text-white' : 'border')}>{s.name}</button>
+          ))}
+        </div>
+      ) : null}
       <div className="bg-white rounded-xl shadow divide-y">
         {visibili.map(m => {
           const s = sel[m.id]
