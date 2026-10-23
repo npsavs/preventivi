@@ -124,8 +124,8 @@ export default function Catalogo() {
           </div>
           {subcategories.filter(s => s.category_id === cat.id).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)).map(s => (
             <div key={s.id} className="ml-4 border-l-2 pl-3">
-              <div className="flex justify-between text-sm">
-                <span className="font-medium text-slate-600">{s.name}</span>
+              <div className="flex justify-between text-sm items-center">
+                <input defaultValue={s.name} onBlur={e => { if (e.target.value.trim() && e.target.value !== s.name) renameSub(s.id, e.target.value) }} className="font-medium text-slate-600 border rounded px-2 py-0.5 text-sm" />
                 <div className="flex gap-2">
                   <button type="button" onClick={() => spostaSub(s.id, -1)} className="text-xs text-slate-500">↑</button>
                   <button type="button" onClick={() => spostaSub(s.id, 1)} className="text-xs text-slate-500">↓</button>
