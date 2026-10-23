@@ -57,12 +57,16 @@ export default function Catalogo() {
   async function spostaSub(id: string, dir: number) {
     const sub = subcategories.find(s => s.id === id)
     if (!sub) return
-    const dellaCat = subcategories.filter(s => s.category_id === sub.category_id).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+    const dellaCat = subcategories.filter(s => s.category_id === sub.category_id)
     const idx = dellaCat.findIndex(s => s.id === id)
-    const altro = dellaCat[idx + dir]
-    if (!altro) return
-    await supabase.from('subcategories').update({ sort_order: altro.sort_order || 0 }).eq('id', id)
-    await supabase.from('subcategories').update({ sort_order: sub.sort_order || 0 }).eq('id', altro.id)
+    const altroIdx = idx + dir
+    if (altroIdx < 0 || altroIdx >= dellaCat.length) return
+    const altro = dellaCat[altroIdx]
+    const ordine = dellaCat.map((s, i) => ({ id: s.id, sort_order: i * 10 }))
+    const mio = ordine.find(o => o.id === id)!
+    const suo = ordine.find(o => o.id === altro.id)!
+    await supabase.from('subcategories').update({ sort_order: suo.sort_order }).eq('id', id)
+    await supabase.from('subcategories').update({ sort_order: mio.sort_order }).eq('id', altro.id)
     load()
   }
 
