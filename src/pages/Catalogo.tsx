@@ -17,7 +17,7 @@ export default function Catalogo() {
 
   async function load() {
     const { data: c } = await supabase.from('categories').select('*').order('name')
-    const { data: s } = await supabase.from('subcategories').select('*').order('name')
+    const { data: s } = await supabase.from('subcategories').select('*').order('sort_order')
     const { data: m } = await supabase.from('materials').select('*').order('name')
     setCategories(c || [])
     setSubcategories(s || [])
@@ -55,18 +55,16 @@ export default function Catalogo() {
   }
 
   async function spostaSub(id: string, dir: number) {
-    const sub = subcategories.find(s => s.id === id)
-    if (!sub) return
-    const dellaCat = subcategories.filter(s => s.category_id === sub.category_id)
+    const dellaCat = subcategories.filter(s => s.category_id === subcategories.find(x => x.id === id)?.category_id)
     const idx = dellaCat.findIndex(s => s.id === id)
     const altroIdx = idx + dir
     if (altroIdx < 0 || altroIdx >= dellaCat.length) return
-    const altro = dellaCat[altroIdx]
-    const ordine = dellaCat.map((s, i) => ({ id: s.id, sort_order: i * 10 }))
-    const mio = ordine.find(o => o.id === id)!
-    const suo = ordine.find(o => o.id === altro.id)!
-    await supabase.from('subcategories').update({ sort_order: suo.sort_order }).eq('id', id)
-    await supabase.from('subcategories').update({ sort_order: mio.sort_order }).eq('id', altro.id)
+    const a = dellaCat[idx]
+    const b = dellaCat[altroIdx]
+    const ordA = a.sort_order ?? idx * 10
+    const ordB = b.sort_order ?? altroIdx * 10
+    await supabase.from('subcategories').update({ sort_order: ordB }).eq('id', a.id)
+    await supabase.from('subcategories').update({ sort_order: ordA }).eq('id', b.id)
     load()
   }
 
