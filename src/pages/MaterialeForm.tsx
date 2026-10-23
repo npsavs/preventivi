@@ -6,8 +6,10 @@ export default function MaterialeForm() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [categories, setCategories] = useState<any[]>([])
+  const [subcategories, setSubcategories] = useState<any[]>([])
   const [form, setForm] = useState({
     category_id: '',
+    subcategory_id: '',
     name: '',
     description: '',
     unit: 'pz',
@@ -16,17 +18,21 @@ export default function MaterialeForm() {
   })
 
   const catFromUrl = new URLSearchParams(window.location.search).get('cat')
+  const subFromUrl = new URLSearchParams(window.location.search).get('sub')
 
   useEffect(() => { start() }, [id])
 
   async function start() {
     const { data: c } = await supabase.from('categories').select('*').order('name')
+    const { data: s } = await supabase.from('subcategories').select('*').order('name')
     setCategories(c || [])
+    setSubcategories(s || [])
     if (id) {
       const { data } = await supabase.from('materials').select('*').eq('id', id).single()
       if (data) {
         setForm({
           category_id: data.category_id || '',
+          subcategory_id: data.subcategory_id || '',
           name: data.name || '',
           description: data.description || '',
           unit: data.unit || 'pz',
@@ -35,7 +41,7 @@ export default function MaterialeForm() {
         })
       }
     } else if (catFromUrl) {
-      setForm(f => ({ ...f, category_id: catFromUrl }))
+      setForm(f => ({ ...f, category_id: catFromUrl, subcategory_id: subFromUrl || '' }))
     } else if (c && c[0]) {
       setForm(f => ({ ...f, category_id: f.category_id || c[0].id }))
     }
@@ -62,6 +68,7 @@ export default function MaterialeForm() {
     if (!form.name || !form.category_id) return alert('Metti nome e categoria')
     const payload = {
       category_id: form.category_id,
+      subcategory_id: form.subcategory_id || null,
       name: form.name,
       description: form.description || null,
       unit: form.unit || 'pz',
@@ -83,6 +90,10 @@ export default function MaterialeForm() {
         <select value={form.category_id} onChange={e => set('category_id', e.target.value)} className="w-full border rounded-lg px-3 py-2">
           <option value="">Scegli categoria</option>
           {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+        <select value={form.subcategory_id} onChange={e => set('subcategory_id', e.target.value)} className="w-full border rounded-lg px-3 py-2">
+          <option value="">Scegli sottocategoria</option>
+          {subcategories.filter(s => s.category_id === form.category_id).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
         <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="Nome prodotto" className="w-full border rounded-lg px-3 py-2" />
         <input value={form.description} onChange={e => set('description', e.target.value)} placeholder="Descrizione" className="w-full border rounded-lg px-3 py-2" />
