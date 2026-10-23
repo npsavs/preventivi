@@ -65,6 +65,8 @@ export default function Catalogo() {
     await supabase.from('subcategories').update({ sort_order: sub.sort_order || 0 }).eq('id', altro.id)
     load()
   }
+
+  async function deleteSubcategory(id: string) {
     if (!confirm('Eliminare la sottocategoria?')) return
     await supabase.from('subcategories').delete().eq('id', id)
     load()
