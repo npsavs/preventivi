@@ -8,7 +8,8 @@ export default function Catalogo() {
   const [subcategories, setSubcategories] = useState<any[]>([])
   const [materials, setMaterials] = useState<Material[]>([])
   const [q, setQ] = useState('')
-  const [catId, setCatId] = useState('')
+  const catFromUrl = new URLSearchParams(window.location.search).get('cat')
+  const [catId, setCatId] = useState(catFromUrl || '')
   const [subId, setSubId] = useState('')
   const [msg, setMsg] = useState('')
 
@@ -53,7 +54,17 @@ export default function Catalogo() {
     else load()
   }
 
-  async function deleteSubcategory(id: string) {
+  async function spostaSub(id: string, dir: number) {
+    const sub = subcategories.find(s => s.id === id)
+    if (!sub) return
+    const dellaCat = subcategories.filter(s => s.category_id === sub.category_id).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+    const idx = dellaCat.findIndex(s => s.id === id)
+    const altro = dellaCat[idx + dir]
+    if (!altro) return
+    await supabase.from('subcategories').update({ sort_order: altro.sort_order || 0 }).eq('id', id)
+    await supabase.from('subcategories').update({ sort_order: sub.sort_order || 0 }).eq('id', altro.id)
+    load()
+  }
     if (!confirm('Eliminare la sottocategoria?')) return
     await supabase.from('subcategories').delete().eq('id', id)
     load()
@@ -107,11 +118,15 @@ export default function Catalogo() {
             <input defaultValue={cat.name} onBlur={e => { if (e.target.value.trim() && e.target.value !== cat.name) renameCategory(cat.id, e.target.value.trim()) }} className="font-semibold border rounded px-2 py-1 flex-1" />
             <button type="button" onClick={() => deleteCategory(cat.id)} className="text-sm text-red-600">Elimina categoria</button>
           </div>
-          {subcategories.filter(s => s.category_id === cat.id).map(s => (
+          {subcategories.filter(s => s.category_id === cat.id).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)).map(s => (
             <div key={s.id} className="ml-4 border-l-2 pl-3">
               <div className="flex justify-between text-sm">
                 <span className="font-medium text-slate-600">{s.name}</span>
-                <button type="button" onClick={() => deleteSubcategory(s.id)} className="text-xs text-red-500">Elimina</button>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => spostaSub(s.id, -1)} className="text-xs text-slate-500">↑</button>
+                  <button type="button" onClick={() => spostaSub(s.id, 1)} className="text-xs text-slate-500">↓</button>
+                  <button type="button" onClick={() => deleteSubcategory(s.id)} className="text-xs text-red-500">Elimina</button>
+                </div>
               </div>
               {materials.filter(m => m.category_id === cat.id && (m as any).subcategory_id === s.id && match(m) && (!subId || subId === s.id)).map(m => (
                 <div key={m.id} className="border-b py-2 text-sm flex justify-between gap-3">
