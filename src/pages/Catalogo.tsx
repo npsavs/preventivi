@@ -159,7 +159,7 @@ export default function Catalogo() {
                   </div>
                   <div className="flex gap-3">
                     <Link to={'/materiale/' + m.id} className="text-blue-600">Modifica</Link>
-                    <button type="button" onClick={() => evidenzia(m.id, !!(m as any).evidenziato)} className="text-xs text-sky-600">{(m as any).evidenziato ? 'Togli' : 'Evidenzia'}</button>
+                    <button type="button" onClick={() => evidenzia(m.id, !!(m as any).evidenziato)} className="text-xs text-green-600">{(m as any).evidenziato ? 'Togli' : 'Evidenzia'}</button>
                     <button type="button" onClick={() => deleteMaterial(m.id)} className="text-red-600">Elimina</button>
                   </div>
                 </div>
@@ -177,7 +177,7 @@ export default function Catalogo() {
               </div>
               <div className="flex gap-3">
                 <Link to={'/materiale/' + m.id} className="text-blue-600">Modifica</Link>
-                <button type="button" onClick={() => evidenzia(m.id, !!(m as any).evidenziato)} className="text-xs text-sky-600">{(m as any).evidenziato ? 'Togli' : 'Evidenzia'}</button>
+                <button type="button" onClick={() => evidenzia(m.id, !!(m as any).evidenziato)} className="text-xs text-green-600">{(m as any).evidenziato ? 'Togli' : 'Evidenzia'}</button>
                 <button type="button" onClick={() => deleteMaterial(m.id)} className="text-red-600">Elimina</button>
               </div>
             </div>
