@@ -84,7 +84,10 @@ export default function Catalogo() {
     load()
   }
 
-  async function deleteMaterial(id: string) {
+  async function evidenzia(id: string, attuale: boolean) {
+    await supabase.from('materials').update({ evidenziato: !attuale }).eq('id', id)
+    load()
+  }
     if (!confirm('Eliminare questo prodotto?')) return
     await supabase.from('materials').delete().eq('id', id)
     load()
