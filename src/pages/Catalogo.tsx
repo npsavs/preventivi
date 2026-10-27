@@ -153,7 +153,7 @@ export default function Catalogo() {
                   <div className="flex gap-3">
                     {m.image_url ? <img src={m.image_url} alt="" className="h-10 w-10 object-contain" /> : null}
                     <div>
-                      <p className={'font-medium ' + ((m as any).evidenziato ? 'bg-sky-100 px-1 rounded' : '')}>{m.name}</p>
+                      <p className="font-medium" style={(m as any).evidenziato ? { background: '#bbf7d0', padding: '0 4px', borderRadius: '4px' } : {}}>{m.name}</p>
                       <p className="text-slate-500">{m.unit} · EUR {Number(m.unit_price).toFixed(2)}</p>
                     </div>
                   </div>
@@ -171,7 +171,7 @@ export default function Catalogo() {
               <div className="flex gap-3">
                 {m.image_url ? <img src={m.image_url} alt="" className="h-10 w-10 object-contain" /> : null}
                 <div>
-                  <p className={'font-medium ' + ((m as any).evidenziato ? 'bg-sky-100 px-1 rounded' : '')}>{m.name}</p>
+                  <p className="font-medium" style={(m as any).evidenziato ? { background: '#bbf7d0', padding: '0 4px', borderRadius: '4px' } : {}}>{m.name}</p>
                   <p className="text-slate-500">{m.unit} · EUR {Number(m.unit_price).toFixed(2)}</p>
                 </div>
               </div>
