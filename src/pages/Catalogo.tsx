@@ -151,12 +151,13 @@ export default function Catalogo() {
                   <div className="flex gap-3">
                     {m.image_url ? <img src={m.image_url} alt="" className="h-10 w-10 object-contain" /> : null}
                     <div>
-                      <p className="font-medium">{m.name}</p>
+                      <p className={'font-medium ' + ((m as any).evidenziato ? 'bg-sky-100 px-1 rounded' : '')}>{m.name}</p>
                       <p className="text-slate-500">{m.unit} · EUR {Number(m.unit_price).toFixed(2)}</p>
                     </div>
                   </div>
                   <div className="flex gap-3">
                     <Link to={'/materiale/' + m.id} className="text-blue-600">Modifica</Link>
+                    <button type="button" onClick={() => evidenzia(m.id, !!(m as any).evidenziato)} className="text-xs text-sky-600">{(m as any).evidenziato ? 'Togli' : 'Evidenzia'}</button>
                     <button type="button" onClick={() => deleteMaterial(m.id)} className="text-red-600">Elimina</button>
                   </div>
                 </div>
@@ -168,12 +169,13 @@ export default function Catalogo() {
               <div className="flex gap-3">
                 {m.image_url ? <img src={m.image_url} alt="" className="h-10 w-10 object-contain" /> : null}
                 <div>
-                  <p className="font-medium">{m.name}</p>
+                  <p className={'font-medium ' + ((m as any).evidenziato ? 'bg-sky-100 px-1 rounded' : '')}>{m.name}</p>
                   <p className="text-slate-500">{m.unit} · EUR {Number(m.unit_price).toFixed(2)}</p>
                 </div>
               </div>
               <div className="flex gap-3">
                 <Link to={'/materiale/' + m.id} className="text-blue-600">Modifica</Link>
+                <button type="button" onClick={() => evidenzia(m.id, !!(m as any).evidenziato)} className="text-xs text-sky-600">{(m as any).evidenziato ? 'Togli' : 'Evidenzia'}</button>
                 <button type="button" onClick={() => deleteMaterial(m.id)} className="text-red-600">Elimina</button>
               </div>
             </div>
