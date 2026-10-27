@@ -29,6 +29,7 @@ export default function Editor() {
   const [items, setItems] = useState<QuoteItem[]>([])
   const [clientId, setClientId] = useState(clienteFromUrl || '')
   const [searchClient, setSearchClient] = useState('')
+  const [modificaCliente, setModificaCliente] = useState(false)
   const [searchProd, setSearchProd] = useState('')
   const [oggetto, setOggetto] = useState('')
   const [footerNotes, setFooterNotes] = useState(NOTE_DEFAULT)
@@ -162,6 +163,32 @@ async function start() {
     }
   }
 
+  async function duplica() {
+    if (!quoteId) return
+    const num = await prossimoNumero()
+    const { data: q } = await supabase.from('quotes').insert({
+      quote_number: num,
+      client_id: clientId || null,
+      status: 'non_spedito',
+      oggetto,
+      footer_notes: footerNotes,
+    }).select().single()
+    if (!q) return alert('Errore duplicazione')
+    for (const it of items) {
+      await supabase.from('quote_items').insert({
+        quote_id: q.id,
+        name: it.name,
+        description: it.description,
+        quantity: it.quantity,
+        unit: it.unit,
+        unit_price: it.unit_price,
+        image_url: it.image_url,
+        is_discount: it.is_discount,
+      })
+    }
+    navigate('/preventivo/' + q.id)
+  }
+
   async function saveHeader() {
     if (!quoteId) return
     if (!clientId) return alert('Seleziona il cliente in anagrafica prima di salvare')
@@ -292,17 +319,23 @@ async function start() {
         <h1 className="text-2xl font-bold flex-1">{quoteNumber || 'Nuovo preventivo'}</h1>
         {!modifica ? <button type="button" onClick={() => setModifica(true)} className="border px-4 py-2 rounded-lg bg-white">Modifica</button> : null}
         {quoteId ? <Link to={'/stampa/' + quoteId} className="bg-slate-900 text-white px-4 py-2 rounded-lg">Anteprima / Stampa</Link> : null}
+        {quoteId ? <button type="button" onClick={duplica} className="border px-4 py-2 rounded-lg bg-white">Duplica</button> : null}
       </div>
       <div className="bg-white rounded-xl shadow p-4 space-y-4">
         <h2 className="font-semibold">Cliente</h2>
-        {selectedClient ? <p className="text-sm text-green-700">Cliente: <strong>{selectedClient.name}</strong></p> : <p className="text-sm text-red-700">Nessun cliente. Senza anagrafica non si puo salvare.</p>}
-        {modifica ? (
+        {selectedClient && !modificaCliente ? (
+          <div className="flex items-center gap-2">
+            <p className="text-sm text-green-700">Cliente: <strong>{selectedClient.name}</strong></p>
+            {modifica ? <button type="button" onClick={() => setModificaCliente(true)} className="text-xs text-blue-600">Modifica cliente</button> : null}
+          </div>
+        ) : selectedClient ? <p className="text-sm text-green-700">Cliente: <strong>{selectedClient.name}</strong></p> : <p className="text-sm text-red-700">Nessun cliente. Senza anagrafica non si puo salvare.</p>}
+        {modifica && (!selectedClient || modificaCliente) ? (
           <>
             <input value={searchClient} onChange={e => setSearchClient(e.target.value)} placeholder="Scrivi almeno 2 lettere..." className="w-full border rounded-lg px-3 py-2" />
             {searchClient.trim().length >= 2 ? (
               <div className="max-h-32 overflow-auto border rounded-lg">
                 {filteredClients.map(c => (
-                  <button key={c.id} type="button" onClick={() => { setClientId(c.id); setDirty(true) }} className={'block w-full text-left px-3 py-2 text-sm ' + (clientId === c.id ? 'bg-blue-50 font-medium' : '')}>{c.name} {c.city ? '· ' + c.city : ''}</button>
+                  <button key={c.id} type="button" onClick={() => { setClientId(c.id); setDirty(true); setModificaCliente(false); setSearchClient('') }} className={'block w-full text-left px-3 py-2 text-sm ' + (clientId === c.id ? 'bg-blue-50 font-medium' : '')}>{c.name} {c.city ? '· ' + c.city : ''}</button>
                 ))}
               </div>
             ) : null}
@@ -374,9 +407,9 @@ async function start() {
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 {!item.is_discount ? (
                   <>
-                    <button type="button" disabled={!modifica} onClick={() => updateItem(item.id, { quantity: Math.max(1, Math.round(Number(item.quantity)) - 1) })} className="w-8 h-8 border rounded">-</button>
-                    <span className="w-8 text-center">{Math.round(Number(item.quantity))}</span>
-                    <button type="button" disabled={!modifica} onClick={() => updateItem(item.id, { quantity: Math.round(Number(item.quantity)) + 1 })} className="w-8 h-8 border rounded">+</button>
+                    <button type="button" disabled={!modifica} onClick={() => updateItem(item.id, { quantity: Math.max(1, Math.round(Number(item.quantity)) - 1) })} className="w-8 h-8 border rounded text-lg">−</button>
+                    <span className="w-10 text-center border rounded py-1">{Math.round(Number(item.quantity))}</span>
+                    <button type="button" disabled={!modifica} onClick={() => updateItem(item.id, { quantity: Math.round(Number(item.quantity)) + 1 })} className="w-8 h-8 border rounded text-lg">+</button>
                   </>
                 ) : null}
                 <span className="text-slate-500">Prezzo originale</span>
