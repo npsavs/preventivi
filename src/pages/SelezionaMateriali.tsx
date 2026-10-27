@@ -73,7 +73,10 @@ export default function SelezionaMateriali() {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Seleziona prodotti</h1>
-        <button type="button" onClick={() => navigate('/preventivo/' + id)} className="text-sm border px-3 py-1 rounded-lg">Torna al preventivo</button>
+        <div className="flex gap-2">
+          <button type="button" onClick={aggiungi} className="bg-slate-900 text-white px-4 py-2 rounded-lg">Aggiungi selezionati ({Object.keys(sel).length})</button>
+          <button type="button" onClick={() => navigate('/preventivo/' + id)} className="text-sm border px-3 py-1 rounded-lg">Torna</button>
+        </div>
       </div>
       <div className="flex flex-wrap gap-2 bg-white p-3 rounded-xl shadow">
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Cerca prodotto..." className="border rounded-lg px-3 py-2 text-sm flex-1 min-w-[160px]" />
@@ -103,9 +106,10 @@ export default function SelezionaMateriali() {
               </div>
               {s ? (
                 <div className="flex gap-2 items-center">
-                  <label className="text-xs">Qtà</label>
-                  <input type="number" min="1" value={s.qty} onChange={e => setQty(m.id, Number(e.target.value))} className="w-16 border rounded px-2 py-1 text-sm" />
-                  <label className="text-xs">Sconto %</label>
+                  <button type="button" onClick={() => setQty(m.id, s.qty - 1)} className="w-8 h-8 border rounded text-lg">−</button>
+                  <span className="w-8 text-center">{s.qty}</span>
+                  <button type="button" onClick={() => setQty(m.id, s.qty + 1)} className="w-8 h-8 border rounded text-lg">+</button>
+                  <label className="text-xs ml-2">Sconto %</label>
                   <input type="number" min="0" max="100" value={s.sconto} onChange={e => setSconto(m.id, Number(e.target.value))} className="w-16 border rounded px-2 py-1 text-sm" />
                 </div>
               ) : null}
@@ -113,7 +117,6 @@ export default function SelezionaMateriali() {
           )
         })}
       </div>
-      <button type="button" onClick={aggiungi} className="bg-slate-900 text-white px-6 py-3 rounded-lg">Aggiungi selezionati ({Object.keys(sel).length})</button>
     </div>
   )
 }
