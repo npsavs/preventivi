@@ -12,6 +12,30 @@ export default function Catalogo() {
   const [catId, setCatId] = useState(catFromUrl || '')
   const [subId, setSubId] = useState('')
   const [msg, setMsg] = useState('')
+  const [dragId, setDragId] = useState('')
+
+  async function spostaMateriale(daId: string, aId: string) {
+    if (!daId || daId === aId) return
+    const da = materials.find(m => m.id === daId)
+    const a = materials.find(m => m.id === aId)
+    if (!da || !a) return
+    if (da.category_id !== a.category_id) return
+    const subDa = (da as any).subcategory_id || null
+    const subA = (a as any).subcategory_id || null
+    if (subDa !== subA) return
+    const gruppo = materials.filter(m => m.category_id === da.category_id && ((m as any).subcategory_id || null) === subDa)
+    const idxDa = gruppo.findIndex(m => m.id === daId)
+    const idxA = gruppo.findIndex(m => m.id === aId)
+    if (idxDa < 0 || idxA < 0) return
+    const nuovo = [...gruppo]
+    const [spostato] = nuovo.splice(idxDa, 1)
+    nuovo.splice(idxA, 0, spostato)
+    for (let i = 0; i < nuovo.length; i++) {
+      await supabase.from('materials').update({ sort_order: i }).eq('id', nuovo[i].id)
+    }
+    setDragId('')
+    load()
+  }
 
   useEffect(() => { load() }, [])
 
