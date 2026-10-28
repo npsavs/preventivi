@@ -11,7 +11,7 @@ export default function Catalogo() {
   const catFromUrl = new URLSearchParams(window.location.search).get('cat')
   const [catId, setCatId] = useState(catFromUrl || '')
   const [subId, setSubId] = useState('')
-  const [msg, setMsg] = useState('')
+  const [aperto, setAperto] = useState('')
   const [dragId, setDragId] = useState('')
 
   async function spostaMateriale(daId: string, aId: string) {
@@ -173,37 +173,53 @@ export default function Catalogo() {
                 </div>
               </div>
               {materials.filter(m => m.category_id === cat.id && (m as any).subcategory_id === s.id && match(m) && (!subId || subId === s.id)).map(m => (
-                <div key={m.id} draggable onDragStart={() => setDragId(m.id)} onDragOver={e => e.preventDefault()} onDrop={() => spostaMateriale(dragId, m.id)} className="border-b py-2 text-sm flex justify-between gap-3 cursor-move">
-                  <div className="flex gap-3">
-                    {m.image_url ? <img src={m.image_url} alt="" className="h-10 w-10 object-contain" /> : null}
-                    <div>
-                      <p className="font-medium" style={(m as any).evidenziato ? { background: '#bbf7d0', padding: '0 4px', borderRadius: '4px' } : {}}>{m.name}</p>
-                      <p className="text-slate-500">{m.unit} · EUR {Number(m.unit_price).toFixed(2)}</p>
+                <div key={m.id} draggable onDragStart={() => setDragId(m.id)} onDragOver={e => e.preventDefault()} onDrop={() => spostaMateriale(dragId, m.id)} className="border-b py-2 text-sm">
+                  <div className="flex justify-between gap-3 cursor-pointer" onClick={() => setAperto(aperto === m.id ? '' : m.id)}>
+                    <div className="flex gap-3">
+                      {m.image_url ? <img src={m.image_url} alt="" className="h-10 w-10 object-contain" /> : null}
+                      <div>
+                        <p className="font-medium" style={(m as any).evidenziato ? { background: '#bbf7d0', padding: '0 4px', borderRadius: '4px' } : {}}>{m.name}</p>
+                        <p className="text-slate-500">{m.unit} · EUR {Number(m.unit_price).toFixed(2)}</p>
+                      </div>
                     </div>
                   </div>
+                  {aperto === m.id ? (
+                    <div className="mt-2 pl-12 space-y-1">
+                      {m.description ? <p className="text-slate-600 text-sm">{m.description}</p> : null}
+                      <p className="text-slate-500 text-sm">Unità: {m.unit} · Prezzo: EUR {Number(m.unit_price).toFixed(2)}</p>
+                      <div className="flex gap-3">
+                        <Link to={'/materiale/' + m.id} className="text-blue-600">Modifica</Link>
+                        <button type="button" onClick={() => evidenzia(m.id, !!(m as any).evidenziato)} className="text-xs text-green-600">{(m as any).evidenziato ? 'Togli' : 'Evidenzia'}</button>
+                        <button type="button" onClick={() => deleteMaterial(m.id)} className="text-red-600">Elimina</button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ))}
+          {materials.filter(m => m.category_id === cat.id && !(m as any).subcategory_id && match(m) && !subId).map(m => (
+            <div key={m.id} draggable onDragStart={() => setDragId(m.id)} onDragOver={e => e.preventDefault()} onDrop={() => spostaMateriale(dragId, m.id)} className="border-b py-2 text-sm">
+              <div className="flex justify-between gap-3 cursor-pointer" onClick={() => setAperto(aperto === m.id ? '' : m.id)}>
+                <div className="flex gap-3">
+                  {m.image_url ? <img src={m.image_url} alt="" className="h-10 w-10 object-contain" /> : null}
+                  <div>
+                    <p className="font-medium" style={(m as any).evidenziato ? { background: '#bbf7d0', padding: '0 4px', borderRadius: '4px' } : {}}>{m.name}</p>
+                    <p className="text-slate-500">{m.unit} · EUR {Number(m.unit_price).toFixed(2)}</p>
+                  </div>
+                </div>
+              </div>
+              {aperto === m.id ? (
+                <div className="mt-2 pl-12 space-y-1">
+                  {m.description ? <p className="text-slate-600 text-sm">{m.description}</p> : null}
+                  <p className="text-slate-500 text-sm">Unità: {m.unit} · Prezzo: EUR {Number(m.unit_price).toFixed(2)}</p>
                   <div className="flex gap-3">
                     <Link to={'/materiale/' + m.id} className="text-blue-600">Modifica</Link>
                     <button type="button" onClick={() => evidenzia(m.id, !!(m as any).evidenziato)} className="text-xs text-green-600">{(m as any).evidenziato ? 'Togli' : 'Evidenzia'}</button>
                     <button type="button" onClick={() => deleteMaterial(m.id)} className="text-red-600">Elimina</button>
                   </div>
                 </div>
-              ))}
-            </div>
-          ))}
-          {materials.filter(m => m.category_id === cat.id && !(m as any).subcategory_id && match(m) && !subId).map(m => (
-            <div key={m.id} draggable onDragStart={() => setDragId(m.id)} onDragOver={e => e.preventDefault()} onDrop={() => spostaMateriale(dragId, m.id)} className="border-b py-2 text-sm flex justify-between gap-3 cursor-move">
-              <div className="flex gap-3">
-                {m.image_url ? <img src={m.image_url} alt="" className="h-10 w-10 object-contain" /> : null}
-                <div>
-                  <p className="font-medium" style={(m as any).evidenziato ? { background: '#bbf7d0', padding: '0 4px', borderRadius: '4px' } : {}}>{m.name}</p>
-                  <p className="text-slate-500">{m.unit} · EUR {Number(m.unit_price).toFixed(2)}</p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <Link to={'/materiale/' + m.id} className="text-blue-600">Modifica</Link>
-                <button type="button" onClick={() => evidenzia(m.id, !!(m as any).evidenziato)} className="text-xs text-green-600">{(m as any).evidenziato ? 'Togli' : 'Evidenzia'}</button>
-                <button type="button" onClick={() => deleteMaterial(m.id)} className="text-red-600">Elimina</button>
-              </div>
+              ) : null}
             </div>
           ))}
         </div>
