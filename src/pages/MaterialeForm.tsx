@@ -79,7 +79,7 @@ export default function MaterialeForm() {
       ? await supabase.from('materials').update(payload).eq('id', id)
       : await supabase.from('materials').insert(payload)
     if (res.error) return alert(res.error.message)
-    navigate('/catalogo')
+    navigate('/catalogo' + (form.category_id ? '?cat=' + form.category_id : '') + (form.subcategory_id ? '&sub=' + form.subcategory_id : ''))
   }
 
   return (
