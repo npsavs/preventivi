@@ -18,7 +18,7 @@ export default function Catalogo() {
   async function load() {
     const { data: c } = await supabase.from('categories').select('*').order('name')
     const { data: s } = await supabase.from('subcategories').select('*').order('sort_order')
-    const { data: m } = await supabase.from('materials').select('*').order('name')
+    const { data: m } = await supabase.from('materials').select('*').order('sort_order')
     setCategories(c || [])
     setSubcategories(s || [])
     setMaterials((m || []) as Material[])
@@ -149,7 +149,7 @@ export default function Catalogo() {
                 </div>
               </div>
               {materials.filter(m => m.category_id === cat.id && (m as any).subcategory_id === s.id && match(m) && (!subId || subId === s.id)).map(m => (
-                <div key={m.id} className="border-b py-2 text-sm flex justify-between gap-3">
+                <div key={m.id} draggable onDragStart={() => setDragId(m.id)} onDragOver={e => e.preventDefault()} onDrop={() => spostaMateriale(dragId, m.id)} className="border-b py-2 text-sm flex justify-between gap-3 cursor-move">
                   <div className="flex gap-3">
                     {m.image_url ? <img src={m.image_url} alt="" className="h-10 w-10 object-contain" /> : null}
                     <div>
@@ -167,7 +167,7 @@ export default function Catalogo() {
             </div>
           ))}
           {materials.filter(m => m.category_id === cat.id && !(m as any).subcategory_id && match(m) && !subId).map(m => (
-            <div key={m.id} className="border-b py-2 text-sm flex justify-between gap-3">
+            <div key={m.id} draggable onDragStart={() => setDragId(m.id)} onDragOver={e => e.preventDefault()} onDrop={() => spostaMateriale(dragId, m.id)} className="border-b py-2 text-sm flex justify-between gap-3 cursor-move">
               <div className="flex gap-3">
                 {m.image_url ? <img src={m.image_url} alt="" className="h-10 w-10 object-contain" /> : null}
                 <div>
