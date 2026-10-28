@@ -12,6 +12,7 @@ export default function Catalogo() {
   const [catId, setCatId] = useState(catFromUrl || '')
   const [subId, setSubId] = useState('')
   const [aperto, setAperto] = useState('')
+  const [msg, setMsg] = useState('')
   const [dragId, setDragId] = useState('')
 
   async function spostaMateriale(daId: string, aId: string) {
