@@ -2,11 +2,25 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
+function normalizza(s: string) {
+  return s.toLowerCase().trim().replace(/\s+/g, ' ')
+}
+
+function simili(a: string, b: string) {
+  const x = normalizza(a)
+  const y = normalizza(b)
+  if (!x || !y) return false
+  if (x === y) return true
+  if (x.includes(y) || y.includes(x)) return true
+  return false
+}
+
 export default function MaterialeForm() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [categories, setCategories] = useState<any[]>([])
   const [subcategories, setSubcategories] = useState<any[]>([])
+  const [materials, setMaterials] = useState<any[]>([])
   const [form, setForm] = useState({
     category_id: '',
     subcategory_id: '',
@@ -25,8 +39,10 @@ export default function MaterialeForm() {
   async function start() {
     const { data: c } = await supabase.from('categories').select('*').order('name')
     const { data: s } = await supabase.from('subcategories').select('*').order('name')
+    const { data: m } = await supabase.from('materials').select('id, name')
     setCategories(c || [])
     setSubcategories(s || [])
+    setMaterials(m || [])
     if (id) {
       const { data } = await supabase.from('materials').select('*').eq('id', id).single()
       if (data) {
@@ -66,6 +82,12 @@ export default function MaterialeForm() {
   async function salva(e: any) {
     e.preventDefault()
     if (!form.name || !form.category_id) return alert('Metti nome e categoria')
+    const esistenti = materials.filter(m => m.id !== id && simili(form.name, m.name))
+    if (esistenti.length > 0) {
+      const nomi = esistenti.map(m => m.name).join(', ')
+      const ok = confirm('In archivio c\'è già un prodotto simile o uguale:\n\n' + nomi + '\n\nVuoi continuare comunque?')
+      if (!ok) return
+    }
     const payload = {
       category_id: form.category_id,
       subcategory_id: form.subcategory_id || null,
@@ -101,8 +123,7 @@ export default function MaterialeForm() {
         <input type="number" step="0.01" value={form.unit_price} onChange={e => set('unit_price', e.target.value)} placeholder="Prezzo" className="w-full border rounded-lg px-3 py-2" />
         <input value={form.image_url} onChange={e => set('image_url', e.target.value)} placeholder="URL foto" className="w-full border rounded-lg px-3 py-2" />
         <input type="file" accept="image/*" onChange={e => { const f = e.target.files && e.target.files[0]; if (f) uploadImage(f) }} />
-        {form.image_url ? <img src={form.image_url} alt="" className="h-20 object-contain" /> : null}
-        <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-lg">Salva prodotto</button>
+        <button className="bg-blue-600 text-white px-4 py-2 rounded-lg">Salva</button>
       </form>
     </div>
   )
