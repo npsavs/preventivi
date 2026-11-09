@@ -221,7 +221,7 @@ export default function Catalogo() {
                         <div className="flex items-center gap-1 mt-1" onClick={e => e.stopPropagation()}>
 
 
-                          <span className="text-xs text-slate-500">Vendita EUR {Number(m.unit_price || 0).toFixed(2)}</span>
+                          <span className="text-sm font-semibold text-black">Vendita EUR {Number(m.unit_price || 0).toFixed(2)}</span>
 
 
                           {editVendita === m.id ? (
@@ -295,7 +295,7 @@ export default function Catalogo() {
                     <div className="flex items-center gap-1 mt-1" onClick={e => e.stopPropagation()}>
 
 
-                      <span className="text-xs text-slate-500">Vendita EUR {Number(m.unit_price || 0).toFixed(2)}</span>
+                      <span className="text-sm font-semibold text-black">Vendita EUR {Number(m.unit_price || 0).toFixed(2)}</span>
 
 
                       {editVendita === m.id ? (
