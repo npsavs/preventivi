@@ -83,18 +83,26 @@ export default function Catalogo() {
   async function setScontoSottocategoria(subId: string, sconto: number) {
     const sc = Math.max(0, Number(sconto) || 0)
     const { error } = await supabase.from('subcategories').update({ sconto: sc }).eq('id', subId)
-    if (error) return alert(error.message)
-    const { data: dellaSub } = await supabase.from('materials').select('*').eq('subcategory_id', subId)
+    if (error) return alert('Errore sconto: ' + error.message)
+    const { data: dellaSub, error: e2 } = await supabase.from('materials').select('id, unit_price, prezzo_netto').eq('subcategory_id', subId)
+    if (e2) return alert('Errore lettura prodotti: ' + e2.message)
     let n = 0
     for (const m of dellaSub || []) {
-      const netto = Number((m as any).prezzo_netto || 0)
-      if (netto <= 0) continue
-      const vendita = Number((netto * (1 + sc / 100)).toFixed(2))
-      await supabase.from('materials').update({ unit_price: vendita }).eq('id', m.id)
+      let netto = Number((m as any).prezzo_netto || 0)
+      let vendita = Number(m.unit_price || 0)
+      if (netto > 0) {
+        vendita = Number((netto * (1 + sc / 100)).toFixed(2))
+      } else if (vendita > 0 && sc > 0) {
+        netto = Number((vendita / (1 + sc / 100)).toFixed(2))
+      } else {
+        continue
+      }
+      const { error: e3 } = await supabase.from('materials').update({ unit_price: vendita, prezzo_netto: netto }).eq('id', m.id)
+      if (e3) { alert('Errore aggiornamento prodotto: ' + e3.message); continue }
       n++
     }
-    setMsg('Sconto ' + sc + '% salvato. Ricalcolati ' + n + ' prodotti con prezzo netto.')
-    load()
+    setMsg('Sconto ' + sc + '%: aggiornati ' + n + ' prodotti (netto e vendita).')
+    await load()
   }
 
   async function spostaSub(id: string, dir: number) {
