@@ -28,11 +28,14 @@ export default function MaterialeForm() {
     description: '',
     unit: 'pz',
     unit_price: '',
+    prezzo_netto: '',
     image_url: '',
   })
 
   const catFromUrl = new URLSearchParams(window.location.search).get('cat')
   const subFromUrl = new URLSearchParams(window.location.search).get('sub')
+  const cat = categories.find(c => c.id === form.category_id)
+  const scontoCat = Number(cat?.sconto || 0)
 
   useEffect(() => { start() }, [id])
 
@@ -53,6 +56,7 @@ export default function MaterialeForm() {
           description: data.description || '',
           unit: data.unit || 'pz',
           unit_price: String(data.unit_price ?? ''),
+          prezzo_netto: String((data as any).prezzo_netto ?? ''),
           image_url: data.image_url || '',
         })
       }
@@ -65,6 +69,18 @@ export default function MaterialeForm() {
 
   function set(k: string, v: string) {
     setForm(f => ({ ...f, [k]: v }))
+  }
+
+  function setNetto(v: string) {
+    const netto = Number(v || 0)
+    const catAttuale = categories.find(c => c.id === form.category_id)
+    const sc = Number(catAttuale?.sconto || 0)
+    const vendita = sc > 0 ? netto * (1 + sc / 100) : Number(form.unit_price || 0)
+    setForm(f => ({
+      ...f,
+      prezzo_netto: v,
+      unit_price: netto > 0 && sc > 0 ? vendita.toFixed(2) : f.unit_price,
+    }))
   }
 
   async function uploadImage(file: File) {
@@ -95,6 +111,7 @@ export default function MaterialeForm() {
       description: form.description || null,
       unit: form.unit || 'pz',
       unit_price: Number(form.unit_price || 0),
+      prezzo_netto: Number(form.prezzo_netto || 0),
       image_url: form.image_url || null,
     }
     const res = id
@@ -120,7 +137,14 @@ export default function MaterialeForm() {
         <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="Nome prodotto" className="w-full border rounded-lg px-3 py-2" />
         <input value={form.description} onChange={e => set('description', e.target.value)} placeholder="Descrizione" className="w-full border rounded-lg px-3 py-2" />
         <input value={form.unit} onChange={e => set('unit', e.target.value)} placeholder="Unita (pz)" className="w-full border rounded-lg px-3 py-2" />
-        <input type="number" step="0.01" value={form.unit_price} onChange={e => set('unit_price', e.target.value)} placeholder="Prezzo" className="w-full border rounded-lg px-3 py-2" />
+        <div>
+          <label className="text-xs text-slate-500">Prezzo netto (solo interno, non sul preventivo)</label>
+          <input type="number" step="0.01" value={form.prezzo_netto} onChange={e => setNetto(e.target.value)} placeholder="Prezzo netto" className="w-full border rounded-lg px-3 py-2" />
+        </div>
+        <div>
+          <label className="text-xs text-slate-500">Prezzo vendita {scontoCat > 0 ? '(sconto categoria ' + scontoCat + '%)' : ''}</label>
+          <input type="number" step="0.01" value={form.unit_price} onChange={e => set('unit_price', e.target.value)} placeholder="Prezzo vendita" className="w-full border rounded-lg px-3 py-2" />
+        </div>
         <input value={form.image_url} onChange={e => set('image_url', e.target.value)} placeholder="URL foto" className="w-full border rounded-lg px-3 py-2" />
         <input type="file" accept="image/*" onChange={e => { const f = e.target.files && e.target.files[0]; if (f) uploadImage(f) }} />
         <button className="bg-blue-600 text-white px-4 py-2 rounded-lg">Salva</button>

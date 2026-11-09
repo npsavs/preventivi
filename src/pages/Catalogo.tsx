@@ -80,6 +80,21 @@ export default function Catalogo() {
     else load()
   }
 
+  async function setScontoCategoria(catId: string, sconto: number) {
+    const sc = Math.max(0, Number(sconto) || 0)
+    const { error } = await supabase.from('categories').update({ sconto: sc }).eq('id', catId)
+    if (error) return alert(error.message)
+    const dellaCat = materials.filter(m => m.category_id === catId)
+    for (const m of dellaCat) {
+      const netto = Number((m as any).prezzo_netto || 0)
+      if (netto <= 0) continue
+      const vendita = Number((netto * (1 + sc / 100)).toFixed(2))
+      await supabase.from('materials').update({ unit_price: vendita }).eq('id', m.id)
+    }
+    setMsg('Sconto categoria ' + sc + '% applicato. Prezzi vendita ricalcolati.')
+    load()
+  }
+
   async function spostaSub(id: string, dir: number) {
     const dellaCat = subcategories.filter(s => s.category_id === subcategories.find(x => x.id === id)?.category_id)
     const idx = dellaCat.findIndex(s => s.id === id)
@@ -159,8 +174,13 @@ export default function Catalogo() {
 
       {cats.map(cat => (
         <div key={cat.id} className="bg-white rounded-xl shadow p-4 space-y-3">
-          <div className="flex gap-2">
-            <input defaultValue={cat.name} onBlur={e => { if (e.target.value.trim() && e.target.value !== cat.name) renameCategory(cat.id, e.target.value.trim()) }} className="font-semibold border rounded px-2 py-1 flex-1" />
+          <div className="flex flex-wrap gap-2 items-center">
+            <input defaultValue={cat.name} onBlur={e => { if (e.target.value.trim() && e.target.value !== cat.name) renameCategory(cat.id, e.target.value.trim()) }} className="font-semibold border rounded px-2 py-1 flex-1 min-w-[120px]" />
+            <label className="text-xs text-slate-500">Sconto %</label>
+            <input type="number" min="0" step="0.1" defaultValue={Number((cat as any).sconto || 0)} onBlur={e => {
+              const v = Number(e.target.value)
+              if (v !== Number((cat as any).sconto || 0)) setScontoCategoria(cat.id, v)
+            }} className="w-16 border rounded px-2 py-1 text-sm" title="Cambia e esci dal campo per ricalcolare i prezzi vendita" />
             <button type="button" onClick={() => deleteCategory(cat.id)} className="text-sm text-red-600">Elimina categoria</button>
           </div>
           {subcategories.filter(s => s.category_id === cat.id).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)).map(s => (
@@ -181,14 +201,14 @@ export default function Catalogo() {
                       {m.image_url ? <img src={m.image_url} alt="" className="h-10 w-10 object-contain" /> : null}
                       <div>
                         <p className="font-medium" style={(m as any).evidenziato ? { background: '#bbf7d0', padding: '0 4px', borderRadius: '4px' } : {}}>{m.name}</p>
-                        <p className="text-slate-500">{m.unit} · EUR {Number(m.unit_price).toFixed(2)}</p>
+                        <p className="text-slate-500">{m.unit} · vendita EUR {Number(m.unit_price).toFixed(2)}{(m as any).prezzo_netto ? ' · netto EUR ' + Number((m as any).prezzo_netto).toFixed(2) : ''}</p>
                       </div>
                     </div>
                   </div>
                   {aperto === m.id ? (
                     <div className="mt-2 pl-12 space-y-1">
                       {m.description ? <p className="text-slate-600 text-sm">{m.description}</p> : null}
-                      <p className="text-slate-500 text-sm">Unità: {m.unit} · Prezzo: EUR {Number(m.unit_price).toFixed(2)}</p>
+                      <p className="text-slate-500 text-sm">Unità: {m.unit} · Vendita: EUR {Number(m.unit_price).toFixed(2)}{(m as any).prezzo_netto ? ' · Netto: EUR ' + Number((m as any).prezzo_netto).toFixed(2) : ''}</p>
                       <div className="flex gap-3">
                         <Link to={'/materiale/' + m.id} className="text-blue-600">Modifica</Link>
                         <button type="button" onClick={() => evidenzia(m.id, !!(m as any).evidenziato)} className="text-xs text-green-600">{(m as any).evidenziato ? 'Togli' : 'Evidenzia'}</button>
@@ -207,14 +227,14 @@ export default function Catalogo() {
                   {m.image_url ? <img src={m.image_url} alt="" className="h-10 w-10 object-contain" /> : null}
                   <div>
                     <p className="font-medium" style={(m as any).evidenziato ? { background: '#bbf7d0', padding: '0 4px', borderRadius: '4px' } : {}}>{m.name}</p>
-                    <p className="text-slate-500">{m.unit} · EUR {Number(m.unit_price).toFixed(2)}</p>
+                    <p className="text-slate-500">{m.unit} · vendita EUR {Number(m.unit_price).toFixed(2)}{(m as any).prezzo_netto ? ' · netto EUR ' + Number((m as any).prezzo_netto).toFixed(2) : ''}</p>
                   </div>
                 </div>
               </div>
               {aperto === m.id ? (
                 <div className="mt-2 pl-12 space-y-1">
                   {m.description ? <p className="text-slate-600 text-sm">{m.description}</p> : null}
-                  <p className="text-slate-500 text-sm">Unità: {m.unit} · Prezzo: EUR {Number(m.unit_price).toFixed(2)}</p>
+                  <p className="text-slate-500 text-sm">Unità: {m.unit} · Vendita: EUR {Number(m.unit_price).toFixed(2)}{(m as any).prezzo_netto ? ' · Netto: EUR ' + Number((m as any).prezzo_netto).toFixed(2) : ''}</p>
                   <div className="flex gap-3">
                     <Link to={'/materiale/' + m.id} className="text-blue-600">Modifica</Link>
                     <button type="button" onClick={() => evidenzia(m.id, !!(m as any).evidenziato)} className="text-xs text-green-600">{(m as any).evidenziato ? 'Togli' : 'Evidenzia'}</button>
