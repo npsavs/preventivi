@@ -15,6 +15,7 @@ export default function Catalogo() {
   const [aperto, setAperto] = useState('')
   const [msg, setMsg] = useState('')
   const [dragId, setDragId] = useState('')
+  const [editVendita, setEditVendita] = useState('')
 
   async function spostaMateriale(daId: string, aId: string) {
     if (!daId || daId === aId) return
@@ -219,13 +220,48 @@ export default function Catalogo() {
 
                         <div className="flex items-center gap-1 mt-1" onClick={e => e.stopPropagation()}>
 
-                          <span className="text-xs text-slate-500">Vendita EUR</span>
 
-                          <input type="number" step="0.01" defaultValue={Number(m.unit_price || 0)} key={m.id + '-' + m.unit_price}
+                          <span className="text-xs text-slate-500">Vendita EUR {Number(m.unit_price || 0).toFixed(2)}</span>
 
-                            onBlur={e => { const v = e.target.value; if (Number(v) !== Number(m.unit_price || 0)) salvaVendita(m.id, v) }}
 
-                            className="w-24 border rounded px-2 py-0.5 text-sm" />
+                          {editVendita === m.id ? (
+
+
+                            <>
+
+
+                              <input id={'vendita-' + m.id} type="number" step="0.01" defaultValue={Number(m.unit_price || 0)} className="w-24 border rounded px-2 py-0.5 text-sm" autoFocus />
+
+
+                              <button type="button" onClick={() => {
+
+
+                                const el = document.getElementById('vendita-' + m.id) as HTMLInputElement
+
+
+                                salvaVendita(m.id, el?.value || '0')
+
+
+                                setEditVendita('')
+
+
+                              }} className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded">Salva</button>
+
+
+                              <button type="button" onClick={() => setEditVendita('')} className="text-xs border px-2 py-0.5 rounded">Annulla</button>
+
+
+                            </>
+
+
+                          ) : (
+
+
+                            <button type="button" onClick={() => setEditVendita(m.id)} className="text-xs text-blue-600">Modifica</button>
+
+
+                          )}
+
 
                         </div>
                       </div>
@@ -258,13 +294,48 @@ export default function Catalogo() {
 
                     <div className="flex items-center gap-1 mt-1" onClick={e => e.stopPropagation()}>
 
-                      <span className="text-xs text-slate-500">Vendita EUR</span>
 
-                      <input type="number" step="0.01" defaultValue={Number(m.unit_price || 0)} key={m.id + '-' + m.unit_price}
+                      <span className="text-xs text-slate-500">Vendita EUR {Number(m.unit_price || 0).toFixed(2)}</span>
 
-                        onBlur={e => { const v = e.target.value; if (Number(v) !== Number(m.unit_price || 0)) salvaVendita(m.id, v) }}
 
-                        className="w-24 border rounded px-2 py-0.5 text-sm" />
+                      {editVendita === m.id ? (
+
+
+                        <>
+
+
+                          <input id={'vendita-' + m.id} type="number" step="0.01" defaultValue={Number(m.unit_price || 0)} className="w-24 border rounded px-2 py-0.5 text-sm" autoFocus />
+
+
+                          <button type="button" onClick={() => {
+
+
+                            const el = document.getElementById('vendita-' + m.id) as HTMLInputElement
+
+
+                            salvaVendita(m.id, el?.value || '0')
+
+
+                            setEditVendita('')
+
+
+                          }} className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded">Salva</button>
+
+
+                          <button type="button" onClick={() => setEditVendita('')} className="text-xs border px-2 py-0.5 rounded">Annulla</button>
+
+
+                        </>
+
+
+                      ) : (
+
+
+                        <button type="button" onClick={() => setEditVendita(m.id)} className="text-xs text-blue-600">Modifica</button>
+
+
+                      )}
+
 
                     </div>
                   </div>
