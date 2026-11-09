@@ -80,18 +80,18 @@ export default function Catalogo() {
     else load()
   }
 
-  async function setScontoCategoria(catId: string, sconto: number) {
+  async function setScontoSottocategoria(subId: string, sconto: number) {
     const sc = Math.max(0, Number(sconto) || 0)
-    const { error } = await supabase.from('categories').update({ sconto: sc }).eq('id', catId)
+    const { error } = await supabase.from('subcategories').update({ sconto: sc }).eq('id', subId)
     if (error) return alert(error.message)
-    const dellaCat = materials.filter(m => m.category_id === catId)
-    for (const m of dellaCat) {
+    const dellaSub = materials.filter(m => (m as any).subcategory_id === subId)
+    for (const m of dellaSub) {
       const netto = Number((m as any).prezzo_netto || 0)
       if (netto <= 0) continue
       const vendita = Number((netto * (1 + sc / 100)).toFixed(2))
       await supabase.from('materials').update({ unit_price: vendita }).eq('id', m.id)
     }
-    setMsg('Sconto categoria ' + sc + '% applicato. Prezzi vendita ricalcolati.')
+    setMsg('Sconto sottocategoria ' + sc + '% applicato. Prezzi vendita ricalcolati.')
     load()
   }
 
@@ -176,18 +176,18 @@ export default function Catalogo() {
         <div key={cat.id} className="bg-white rounded-xl shadow p-4 space-y-3">
           <div className="flex flex-wrap gap-2 items-center">
             <input defaultValue={cat.name} onBlur={e => { if (e.target.value.trim() && e.target.value !== cat.name) renameCategory(cat.id, e.target.value.trim()) }} className="font-semibold border rounded px-2 py-1 flex-1 min-w-[120px]" />
-            <label className="text-xs text-slate-500">Sconto %</label>
-            <input type="number" min="0" step="0.1" defaultValue={Number((cat as any).sconto || 0)} onBlur={e => {
-              const v = Number(e.target.value)
-              if (v !== Number((cat as any).sconto || 0)) setScontoCategoria(cat.id, v)
-            }} className="w-16 border rounded px-2 py-1 text-sm" title="Cambia e esci dal campo per ricalcolare i prezzi vendita" />
             <button type="button" onClick={() => deleteCategory(cat.id)} className="text-sm text-red-600">Elimina categoria</button>
           </div>
           {subcategories.filter(s => s.category_id === cat.id).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)).map(s => (
             <div key={s.id} className="ml-4 border-l-2 pl-3">
-              <div className="flex justify-between text-sm items-center">
+              <div className="flex flex-wrap justify-between text-sm items-center gap-2">
                 <span className="font-medium text-slate-600">{s.name}</span>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 items-center">
+                  <label className="text-xs text-slate-500">Sconto %</label>
+                  <input type="number" min="0" step="0.1" defaultValue={Number(s.sconto || 0)} onBlur={e => {
+                    const v = Number(e.target.value)
+                    if (v !== Number(s.sconto || 0)) setScontoSottocategoria(s.id, v)
+                  }} className="w-16 border rounded px-2 py-1 text-xs" title="Cambia e esci dal campo per ricalcolare i prezzi vendita" />
                   <button type="button" onClick={() => renameSub(s.id)} className="text-xs text-blue-600">Modifica</button>
                   <button type="button" onClick={() => spostaSub(s.id, -1)} className="text-xs text-slate-500">↑</button>
                   <button type="button" onClick={() => spostaSub(s.id, 1)} className="text-xs text-slate-500">↓</button>

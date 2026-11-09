@@ -34,8 +34,8 @@ export default function MaterialeForm() {
 
   const catFromUrl = new URLSearchParams(window.location.search).get('cat')
   const subFromUrl = new URLSearchParams(window.location.search).get('sub')
-  const cat = categories.find(c => c.id === form.category_id)
-  const scontoCat = Number(cat?.sconto || 0)
+  const sub = subcategories.find(s => s.id === form.subcategory_id)
+  const scontoSub = Number(sub?.sconto || 0)
 
   useEffect(() => { start() }, [id])
 
@@ -73,8 +73,8 @@ export default function MaterialeForm() {
 
   function setNetto(v: string) {
     const netto = Number(v || 0)
-    const catAttuale = categories.find(c => c.id === form.category_id)
-    const sc = Number(catAttuale?.sconto || 0)
+    const subAttuale = subcategories.find(s => s.id === form.subcategory_id)
+    const sc = Number(subAttuale?.sconto || 0)
     const vendita = sc > 0 ? netto * (1 + sc / 100) : Number(form.unit_price || 0)
     setForm(f => ({
       ...f,
@@ -142,7 +142,7 @@ export default function MaterialeForm() {
           <input type="number" step="0.01" value={form.prezzo_netto} onChange={e => setNetto(e.target.value)} placeholder="Prezzo netto" className="w-full border rounded-lg px-3 py-2" />
         </div>
         <div>
-          <label className="text-xs text-slate-500">Prezzo vendita {scontoCat > 0 ? '(sconto categoria ' + scontoCat + '%)' : ''}</label>
+          <label className="text-xs text-slate-500">Prezzo vendita {scontoSub > 0 ? '(sconto sottocategoria ' + scontoSub + '%)' : ''}</label>
           <input type="number" step="0.01" value={form.unit_price} onChange={e => set('unit_price', e.target.value)} placeholder="Prezzo vendita" className="w-full border rounded-lg px-3 py-2" />
         </div>
         <input value={form.image_url} onChange={e => set('image_url', e.target.value)} placeholder="URL foto" className="w-full border rounded-lg px-3 py-2" />
