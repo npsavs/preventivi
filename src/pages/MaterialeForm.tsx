@@ -27,8 +27,9 @@ export default function MaterialeForm() {
     name: '',
     description: '',
     unit: 'pz',
-    unit_price: '',
+    prezzo_listino: '',
     prezzo_netto: '',
+    unit_price: '',
     image_url: '',
   })
 
@@ -49,14 +50,16 @@ export default function MaterialeForm() {
     if (id) {
       const { data } = await supabase.from('materials').select('*').eq('id', id).single()
       if (data) {
+        const listino = String((data as any).prezzo_listino ?? data.unit_price ?? '')
         setForm({
           category_id: data.category_id || '',
           subcategory_id: data.subcategory_id || '',
           name: data.name || '',
           description: data.description || '',
           unit: data.unit || 'pz',
-          unit_price: String(data.unit_price ?? ''),
+          prezzo_listino: listino,
           prezzo_netto: String((data as any).prezzo_netto ?? ''),
+          unit_price: String(data.unit_price ?? listino),
           image_url: data.image_url || '',
         })
       }
@@ -71,15 +74,17 @@ export default function MaterialeForm() {
     setForm(f => ({ ...f, [k]: v }))
   }
 
-  function setNetto(v: string) {
-    const netto = Number(v || 0)
+  function setListino(v: string) {
+    const listino = Number(v || 0)
     const subAttuale = subcategories.find(s => s.id === form.subcategory_id)
     const sc = Number(subAttuale?.sconto || 0)
-    const vendita = sc > 0 ? netto * (1 + sc / 100) : Number(form.unit_price || 0)
+    const netto = listino > 0 && sc > 0 && sc < 100
+      ? Number((listino * (1 - sc / 100)).toFixed(2))
+      : Number(form.prezzo_netto || 0)
     setForm(f => ({
       ...f,
-      prezzo_netto: v,
-      unit_price: netto > 0 && sc > 0 ? vendita.toFixed(2) : f.unit_price,
+      prezzo_listino: v,
+      prezzo_netto: listino > 0 && sc > 0 && sc < 100 ? String(netto) : f.prezzo_netto,
     }))
   }
 
@@ -104,14 +109,16 @@ export default function MaterialeForm() {
       const ok = confirm('In archivio c\'è già un prodotto simile o uguale:\n\n' + nomi + '\n\nVuoi continuare comunque?')
       if (!ok) return
     }
+    const listino = Number(form.prezzo_listino || 0)
     const payload = {
       category_id: form.category_id,
       subcategory_id: form.subcategory_id || null,
       name: form.name,
       description: form.description || null,
       unit: form.unit || 'pz',
-      unit_price: Number(form.unit_price || 0),
+      prezzo_listino: listino,
       prezzo_netto: Number(form.prezzo_netto || 0),
+      unit_price: Number(form.unit_price || 0),
       image_url: form.image_url || null,
     }
     const res = id
@@ -138,12 +145,16 @@ export default function MaterialeForm() {
         <input value={form.description} onChange={e => set('description', e.target.value)} placeholder="Descrizione" className="w-full border rounded-lg px-3 py-2" />
         <input value={form.unit} onChange={e => set('unit', e.target.value)} placeholder="Unita (pz)" className="w-full border rounded-lg px-3 py-2" />
         <div>
-          <label className="text-xs text-slate-500">Prezzo netto (solo interno, non sul preventivo)</label>
-          <input type="number" step="0.01" value={form.prezzo_netto} onChange={e => setNetto(e.target.value)} placeholder="Prezzo netto" className="w-full border rounded-lg px-3 py-2" />
+          <label className="text-xs text-slate-500">Prezzo di listino {scontoSub > 0 ? '(sconto sottocategoria ' + scontoSub + '%)' : ''}</label>
+          <input type="number" step="0.01" value={form.prezzo_listino} onChange={e => setListino(e.target.value)} placeholder="Prezzo di listino" className="w-full border rounded-lg px-3 py-2" />
         </div>
         <div>
-          <label className="text-xs text-slate-500">Prezzo vendita {scontoSub > 0 ? '(sconto sottocategoria ' + scontoSub + '%)' : ''}</label>
-          <input type="number" step="0.01" value={form.unit_price} onChange={e => set('unit_price', e.target.value)} placeholder="Prezzo vendita" className="w-full border rounded-lg px-3 py-2" />
+          <label className="text-xs text-slate-500">Prezzo netto (solo interno, calcolato dallo sconto)</label>
+          <input type="number" step="0.01" value={form.prezzo_netto} onChange={e => set('prezzo_netto', e.target.value)} placeholder="Prezzo netto" className="w-full border rounded-lg px-3 py-2" />
+        </div>
+        <div>
+          <label className="text-xs text-slate-500">Prezzo di vendita (appare sui preventivi)</label>
+          <input type="number" step="0.01" value={form.unit_price} onChange={e => set('unit_price', e.target.value)} placeholder="Prezzo di vendita" className="w-full border rounded-lg px-3 py-2" />
         </div>
         <input value={form.image_url} onChange={e => set('image_url', e.target.value)} placeholder="URL foto" className="w-full border rounded-lg px-3 py-2" />
         <input type="file" accept="image/*" onChange={e => { const f = e.target.files && e.target.files[0]; if (f) uploadImage(f) }} />
