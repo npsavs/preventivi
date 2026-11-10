@@ -16,6 +16,9 @@ export default function Catalogo() {
   const [msg, setMsg] = useState('')
   const [dragId, setDragId] = useState('')
   const [editVendita, setEditVendita] = useState('')
+  const [tags, setTags] = useState<any[]>([])
+  const [materialTags, setMaterialTags] = useState<any[]>([])
+  const [tagId, setTagId] = useState('')
 
   async function spostaMateriale(daId: string, aId: string) {
     if (!daId || daId === aId) return
@@ -46,9 +49,56 @@ export default function Catalogo() {
     const { data: c } = await supabase.from('categories').select('*').order('name')
     const { data: s } = await supabase.from('subcategories').select('*').order('sort_order')
     const { data: m } = await supabase.from('materials').select('*').order('sort_order')
+    const { data: tgs } = await supabase.from('tags').select('*').order('name')
+    const { data: mt } = await supabase.from('material_tags').select('*')
     setCategories(c || [])
     setSubcategories(s || [])
     setMaterials((m || []) as Material[])
+    setTags(tgs || [])
+    setMaterialTags(mt || [])
+  }
+
+
+  async function addTag() {
+    const nome = prompt('Nome del tag')
+    if (!nome || !nome.trim()) return
+    const colori = ['#3b82f6', '#22c55e', '#eab308', '#ef4444', '#a855f7', '#f97316', '#06b6d4', '#64748b']
+    const elenco = colori.map((c, i) => (i + 1) + ') ' + c).join('\n')
+    const scelta = prompt('Colore del riquadro (1-8 o codice #hex):\n' + elenco, '1')
+    let color = '#3b82f6'
+    if (scelta) {
+      const n = Number(scelta)
+      if (n >= 1 && n <= 8) color = colori[n - 1]
+      else if (scelta.startsWith('#')) color = scelta.trim()
+    }
+    const { error } = await supabase.from('tags').insert({ name: nome.trim(), color })
+    if (error) return alert(error.message)
+    load()
+  }
+
+  async function deleteTag(id: string) {
+    if (!confirm('Eliminare questo tag?')) return
+    await supabase.from('material_tags').delete().eq('tag_id', id)
+    const { error } = await supabase.from('tags').delete().eq('id', id)
+    if (error) return alert(error.message)
+    if (tagId === id) setTagId('')
+    load()
+  }
+
+  async function toggleTagMateriale(materialId: string, tId: string) {
+    const esiste = materialTags.some(x => x.material_id === materialId && x.tag_id === tId)
+    if (esiste) {
+      await supabase.from('material_tags').delete().eq('material_id', materialId).eq('tag_id', tId)
+    } else {
+      const { error } = await supabase.from('material_tags').insert({ material_id: materialId, tag_id: tId })
+      if (error) return alert(error.message)
+    }
+    load()
+  }
+
+  function tagsDi(materialId: string) {
+    const ids = materialTags.filter(x => x.material_id === materialId).map(x => x.tag_id)
+    return tags.filter(tg => ids.includes(tg.id))
   }
 
   async function addCategory() {
@@ -152,9 +202,13 @@ export default function Catalogo() {
   const cats = catId ? categories.filter(c => c.id === catId) : categories
   const subs = subcategories.filter(s => !catId || s.category_id === catId)
   const match = (m: Material) => {
-    const t = q.toLowerCase()
-    if (!t) return true
-    return m.name.toLowerCase().includes(t) || String(m.description || '').toLowerCase().includes(t)
+    if (tagId) {
+      const ok = materialTags.some(x => x.material_id === m.id && x.tag_id === tagId)
+      if (!ok) return false
+    }
+    if (!q.trim()) return true
+    const tq = q.toLowerCase()
+    return m.name.toLowerCase().includes(tq) || (m.description || '').toLowerCase().includes(tq)
   }
 
   return (
@@ -184,6 +238,21 @@ export default function Catalogo() {
           ))}
         </div>
       ) : null}
+
+      
+      <div className="flex flex-wrap gap-2 items-center bg-white p-3 rounded-xl shadow">
+        <span className="text-sm text-slate-500">Tag:</span>
+        <button type="button" onClick={() => setTagId('')} className={'px-3 py-1.5 rounded-lg text-sm border ' + (!tagId ? 'bg-slate-900 text-white border-slate-900' : '')}>Tutti</button>
+        {tags.map(tg => (
+          <button key={tg.id} type="button" onClick={() => setTagId(tagId === tg.id ? '' : tg.id)}
+            className={'px-3 py-1.5 rounded-lg text-sm text-white flex items-center gap-2 ' + (tagId === tg.id ? 'ring-2 ring-offset-1 ring-slate-900' : '')}
+            style={{ backgroundColor: tg.color || '#64748b' }}>
+            {tg.name}
+            <span onClick={e => { e.stopPropagation(); deleteTag(tg.id) }} className="text-xs opacity-80 hover:opacity-100">×</span>
+          </button>
+        ))}
+        <button type="button" onClick={addTag} className="px-3 py-1.5 rounded-lg text-sm border border-dashed">+ Aggiungi tag</button>
+      </div>
 
       {cats.map(cat => (
         <div key={cat.id} className="bg-white rounded-xl shadow p-4 space-y-3">
@@ -264,6 +333,12 @@ export default function Catalogo() {
 
 
                         </div>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {tagsDi(m.id).map(tg => (
+                          <span key={tg.id} className="text-xs text-white px-2 py-0.5 rounded" style={{ backgroundColor: tg.color }}>{tg.name}</span>
+                        ))}
+                      </div>
+
                       </div>
                     </div>
                   </div>
@@ -271,6 +346,24 @@ export default function Catalogo() {
                     <div className="mt-2 pl-12 space-y-1">
                       {m.description ? <p className="text-slate-600 text-sm">{m.description}</p> : null}
                       <p className="text-slate-500 text-sm">Unità: {m.unit} · Listino: EUR {Number((m as any).prezzo_listino || m.unit_price || 0).toFixed(2)} · Netto: EUR {Number((m as any).prezzo_netto || 0).toFixed(2)} · Vendita: EUR {Number(m.unit_price).toFixed(2)}</p>
+                      <div className="flex flex-wrap gap-1 my-1">
+                        {tagsDi(m.id).map(tg => (
+                          <span key={tg.id} className="text-xs text-white px-2 py-0.5 rounded" style={{ backgroundColor: tg.color }}>{tg.name}</span>
+                        ))}
+                      </div>
+                      <div className="flex flex-wrap gap-1 my-1">
+                        <span className="text-xs text-slate-500 self-center">Tag:</span>
+                        {tags.map(tg => {
+                          const on = materialTags.some(x => x.material_id === m.id && x.tag_id === tg.id)
+                          return (
+                            <button key={tg.id} type="button" onClick={e => { e.stopPropagation(); toggleTagMateriale(m.id, tg.id) }}
+                              className={'text-xs px-2 py-0.5 rounded border ' + (on ? 'text-white' : 'text-slate-600')}
+                              style={on ? { backgroundColor: tg.color, borderColor: tg.color } : {}}>
+                              {tg.name}
+                            </button>
+                          )
+                        })}
+                      </div>
                       <div className="flex gap-3">
                         <Link to={'/materiale/' + m.id} className="text-blue-600">Modifica</Link>
                         <button type="button" onClick={() => evidenzia(m.id, !!(m as any).evidenziato)} className="text-xs text-green-600">{(m as any).evidenziato ? 'Togli' : 'Evidenzia'}</button>
@@ -338,6 +431,12 @@ export default function Catalogo() {
 
 
                     </div>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {tagsDi(m.id).map(tg => (
+                          <span key={tg.id} className="text-xs text-white px-2 py-0.5 rounded" style={{ backgroundColor: tg.color }}>{tg.name}</span>
+                        ))}
+                      </div>
+
                   </div>
                 </div>
               </div>
@@ -345,6 +444,19 @@ export default function Catalogo() {
                 <div className="mt-2 pl-12 space-y-1">
                   {m.description ? <p className="text-slate-600 text-sm">{m.description}</p> : null}
                   <p className="text-slate-500 text-sm">Unità: {m.unit} · Listino: EUR {Number((m as any).prezzo_listino || m.unit_price || 0).toFixed(2)} · Netto: EUR {Number((m as any).prezzo_netto || 0).toFixed(2)} · Vendita: EUR {Number(m.unit_price).toFixed(2)}</p>
+                  <div className="flex flex-wrap gap-1 my-1">
+                    <span className="text-xs text-slate-500 self-center">Tag:</span>
+                    {tags.map(tg => {
+                      const on = materialTags.some(x => x.material_id === m.id && x.tag_id === tg.id)
+                      return (
+                        <button key={tg.id} type="button" onClick={e => { e.stopPropagation(); toggleTagMateriale(m.id, tg.id) }}
+                          className={'text-xs px-2 py-0.5 rounded border ' + (on ? 'text-white' : 'text-slate-600')}
+                          style={on ? { backgroundColor: tg.color, borderColor: tg.color } : {}}>
+                          {tg.name}
+                        </button>
+                      )
+                    })}
+                  </div>
                   <div className="flex gap-3">
                     <Link to={'/materiale/' + m.id} className="text-blue-600">Modifica</Link>
                     <button type="button" onClick={() => evidenzia(m.id, !!(m as any).evidenziato)} className="text-xs text-green-600">{(m as any).evidenziato ? 'Togli' : 'Evidenzia'}</button>
