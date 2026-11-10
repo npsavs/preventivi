@@ -346,23 +346,20 @@ export default function Catalogo() {
                     <div className="mt-2 pl-12 space-y-1">
                       {m.description ? <p className="text-slate-600 text-sm">{m.description}</p> : null}
                       <p className="text-slate-500 text-sm">Unità: {m.unit} · Listino: EUR {Number((m as any).prezzo_listino || m.unit_price || 0).toFixed(2)} · Netto: EUR {Number((m as any).prezzo_netto || 0).toFixed(2)} · Vendita: EUR {Number(m.unit_price).toFixed(2)}</p>
-                      <div className="flex flex-wrap gap-1 my-1">
+                      <div className="flex flex-wrap gap-1 my-1 items-center" onClick={e => e.stopPropagation()}>
                         {tagsDi(m.id).map(tg => (
-                          <span key={tg.id} className="text-xs text-white px-2 py-0.5 rounded" style={{ backgroundColor: tg.color }}>{tg.name}</span>
+                          <button key={tg.id} type="button" onClick={() => toggleTagMateriale(m.id, tg.id)}
+                            className="text-xs text-white px-2 py-0.5 rounded" style={{ backgroundColor: tg.color }} title="Clic per togliere">
+                            {tg.name} ×
+                          </button>
                         ))}
-                      </div>
-                      <div className="flex flex-wrap gap-1 my-1">
-                        <span className="text-xs text-slate-500 self-center">Tag:</span>
-                        {tags.map(tg => {
-                          const on = materialTags.some(x => x.material_id === m.id && x.tag_id === tg.id)
-                          return (
-                            <button key={tg.id} type="button" onClick={e => { e.stopPropagation(); toggleTagMateriale(m.id, tg.id) }}
-                              className={'text-xs px-2 py-0.5 rounded border ' + (on ? 'text-white' : 'text-slate-600')}
-                              style={on ? { backgroundColor: tg.color, borderColor: tg.color } : {}}>
-                              {tg.name}
-                            </button>
-                          )
-                        })}
+                        <select className="text-xs border rounded px-1 py-0.5" defaultValue=""
+                          onChange={e => { if (e.target.value) { toggleTagMateriale(m.id, e.target.value); e.target.value = '' } }}>
+                          <option value="">+ Tag</option>
+                          {tags.filter(tg => !materialTags.some(x => x.material_id === m.id && x.tag_id === tg.id)).map(tg => (
+                            <option key={tg.id} value={tg.id}>{tg.name}</option>
+                          ))}
+                        </select>
                       </div>
                       <div className="flex gap-3">
                         <Link to={'/materiale/' + m.id} className="text-blue-600">Modifica</Link>
@@ -444,18 +441,20 @@ export default function Catalogo() {
                 <div className="mt-2 pl-12 space-y-1">
                   {m.description ? <p className="text-slate-600 text-sm">{m.description}</p> : null}
                   <p className="text-slate-500 text-sm">Unità: {m.unit} · Listino: EUR {Number((m as any).prezzo_listino || m.unit_price || 0).toFixed(2)} · Netto: EUR {Number((m as any).prezzo_netto || 0).toFixed(2)} · Vendita: EUR {Number(m.unit_price).toFixed(2)}</p>
-                  <div className="flex flex-wrap gap-1 my-1">
-                    <span className="text-xs text-slate-500 self-center">Tag:</span>
-                    {tags.map(tg => {
-                      const on = materialTags.some(x => x.material_id === m.id && x.tag_id === tg.id)
-                      return (
-                        <button key={tg.id} type="button" onClick={e => { e.stopPropagation(); toggleTagMateriale(m.id, tg.id) }}
-                          className={'text-xs px-2 py-0.5 rounded border ' + (on ? 'text-white' : 'text-slate-600')}
-                          style={on ? { backgroundColor: tg.color, borderColor: tg.color } : {}}>
-                          {tg.name}
-                        </button>
-                      )
-                    })}
+                  <div className="flex flex-wrap gap-1 my-1 items-center" onClick={e => e.stopPropagation()}>
+                    {tagsDi(m.id).map(tg => (
+                      <button key={tg.id} type="button" onClick={() => toggleTagMateriale(m.id, tg.id)}
+                        className="text-xs text-white px-2 py-0.5 rounded" style={{ backgroundColor: tg.color }} title="Clic per togliere">
+                        {tg.name} ×
+                      </button>
+                    ))}
+                    <select className="text-xs border rounded px-1 py-0.5" defaultValue=""
+                      onChange={e => { if (e.target.value) { toggleTagMateriale(m.id, e.target.value); e.target.value = '' } }}>
+                      <option value="">+ Tag</option>
+                      {tags.filter(tg => !materialTags.some(x => x.material_id === m.id && x.tag_id === tg.id)).map(tg => (
+                        <option key={tg.id} value={tg.id}>{tg.name}</option>
+                      ))}
+                    </select>
                   </div>
                   <div className="flex gap-3">
                     <Link to={'/materiale/' + m.id} className="text-blue-600">Modifica</Link>
