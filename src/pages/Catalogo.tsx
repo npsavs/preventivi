@@ -133,7 +133,7 @@ export default function Catalogo() {
   }
 
   async function setScontoSottocategoria(subId: string, sconto: number) {
-    const sc = Math.max(0, Math.min(100, Number(sconto) || 0))
+    const sc = Math.max(0, Math.min(100, Math.abs(Number(sconto) || 0)))
     const { error } = await supabase.from('subcategories').update({ sconto: sc }).eq('id', subId)
     if (error) return alert('Errore sconto: ' + error.message)
     const { data: dellaSub, error: e2 } = await supabase.from('materials').select('id, unit_price, prezzo_listino, prezzo_netto').eq('subcategory_id', subId)
@@ -290,7 +290,7 @@ export default function Catalogo() {
                 <span className="font-medium text-slate-600">{s.name}</span>
                 <div className="flex flex-wrap gap-2 items-center">
                   <label className="text-xs text-slate-500">Sconto %</label>
-                  <input id={'sconto-' + s.id} type="number" min="0" step="0.1" defaultValue={Number(s.sconto || 0)} className="w-16 border rounded px-2 py-1 text-xs" />
+                  <input id={'sconto-' + s.id} type="number" max="0" min="-100" step="0.1" defaultValue={Number(s.sconto || 0) ? -Math.abs(Number(s.sconto || 0)) : 0} className="w-16 border rounded px-2 py-1 text-xs" title="Valore negativo, es. -66" />
                   <button type="button" onClick={() => {
                     const el = document.getElementById('sconto-' + s.id) as HTMLInputElement
                     setScontoSottocategoria(s.id, Number(el?.value || 0))
