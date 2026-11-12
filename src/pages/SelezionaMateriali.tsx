@@ -18,10 +18,10 @@ export default function SelezionaMateriali() {
   const [sel, setSel] = useState<Record<string, { qty: number; sconto: number; prezzo: number }>>({})
 
   useEffect(() => {
-    supabase.from('categories').select('*').order('name').then(({ data }) => setCategories(data || []))
+    supabase.from('categories').select('*').order('sort_order').then(({ data }) => setCategories(data || []))
     supabase.from('subcategories').select('*').order('sort_order').then(({ data }) => setSubcategories(data || []))
     supabase.from('materials').select('*').order('name').then(({ data }) => setMaterials(data || []))
-    supabase.from('tags').select('*').order('name').then(({ data }) => setTags(data || []))
+    supabase.from('tags').select('*').order('sort_order').then(({ data }) => setTags(data || []))
     supabase.from('material_tags').select('*').then(({ data }) => setMaterialTags(data || []))
   }, [])
 

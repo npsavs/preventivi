@@ -46,10 +46,10 @@ export default function Catalogo() {
   useEffect(() => { load() }, [])
 
   async function load() {
-    const { data: c } = await supabase.from('categories').select('*').order('name')
+    const { data: c } = await supabase.from('categories').select('*').order('sort_order')
     const { data: s } = await supabase.from('subcategories').select('*').order('sort_order')
     const { data: m } = await supabase.from('materials').select('*').order('sort_order')
-    const { data: tgs } = await supabase.from('tags').select('*').order('name')
+    const { data: tgs } = await supabase.from('tags').select('*').order('sort_order')
     const { data: mt } = await supabase.from('material_tags').select('*')
     setCategories(c || [])
     setSubcategories(s || [])

@@ -70,9 +70,9 @@ function SezioneMateriali() {
   const [editTagColor, setEditTagColor] = useState('#3b82f6')
 
   async function load() {
-    const { data: c } = await supabase.from('categories').select('*').order('name')
+    const { data: c } = await supabase.from('categories').select('*').order('sort_order')
     const { data: s } = await supabase.from('subcategories').select('*').order('sort_order')
-    const { data: t } = await supabase.from('tags').select('*').order('name')
+    const { data: t } = await supabase.from('tags').select('*').order('sort_order')
     setCategories(c || [])
     setSubcategories(s || [])
     setTags(t || [])
@@ -81,6 +81,20 @@ function SezioneMateriali() {
   }
 
   useEffect(() => { load() }, [])
+
+
+  async function sposta(tabella: 'categories' | 'subcategories' | 'tags', lista: any[], id: string, dir: number) {
+    const idx = lista.findIndex(x => x.id === id)
+    const altro = idx + dir
+    if (idx < 0 || altro < 0 || altro >= lista.length) return
+    const a = lista[idx]
+    const b = lista[altro]
+    const ordA = a.sort_order ?? idx * 10
+    const ordB = b.sort_order ?? altro * 10
+    await supabase.from(tabella).update({ sort_order: ordB }).eq('id', a.id)
+    await supabase.from(tabella).update({ sort_order: ordA }).eq('id', b.id)
+    load()
+  }
 
   async function creaCategoria() {
     if (!catNome.trim()) return alert('Scrivi il nome della categoria')
@@ -132,7 +146,7 @@ function SezioneMateriali() {
   }
 
   async function setScontoSub(id: string, sconto: number) {
-    const sc = Math.max(0, Math.min(100, Number(sconto) || 0))
+    const sc = Math.max(0, Math.min(100, Math.abs(Number(sconto) || 0)))
     const { error } = await supabase.from('subcategories').update({ sconto: sc }).eq('id', id)
     if (error) return alert(error.message)
     const { data: mats } = await supabase.from('materials').select('id, unit_price, prezzo_listino').eq('subcategory_id', id)
@@ -202,8 +216,10 @@ function SezioneMateriali() {
         </div>
         <div className="divide-y border rounded-lg">
           {categories.length === 0 ? <p className="p-3 text-sm text-slate-500">Nessuna categoria</p> : null}
-          {categories.map(c => (
+          {categories.map((c, i) => (
             <div key={c.id} className="flex flex-wrap items-center gap-2 p-3">
+              <button type="button" disabled={i === 0} onClick={() => sposta('categories', categories, c.id, -1)} className="border px-2 py-0.5 rounded disabled:opacity-30">↑</button>
+              <button type="button" disabled={i === categories.length - 1} onClick={() => sposta('categories', categories, c.id, 1)} className="border px-2 py-0.5 rounded disabled:opacity-30">↓</button>
               <input defaultValue={c.name} onBlur={e => { if (e.target.value.trim() && e.target.value !== c.name) rinominaCategoria(c.id, e.target.value) }} className="border rounded px-2 py-1 flex-1 min-w-[140px]" />
               <button type="button" onClick={() => eliminaCategoria(c.id)} className="text-sm text-red-600">Elimina</button>
             </div>
@@ -228,18 +244,23 @@ function SezioneMateriali() {
           {subCatId && subcategories.filter(s => s.category_id === subCatId).length === 0 ? (
             <p className="p-3 text-sm text-slate-500">Nessuna sottocategoria in questa categoria</p>
           ) : null}
-          {subcategories.filter(s => !subCatId || s.category_id === subCatId).map(s => (
+          {(() => {
+            const lista = subcategories.filter(s => !subCatId || s.category_id === subCatId)
+            return lista.map((s, i) => (
             <div key={s.id} className="flex flex-wrap items-center gap-2 p-3">
+              <button type="button" disabled={i === 0} onClick={() => sposta('subcategories', lista, s.id, -1)} className="border px-2 py-0.5 rounded disabled:opacity-30">↑</button>
+              <button type="button" disabled={i === lista.length - 1} onClick={() => sposta('subcategories', lista, s.id, 1)} className="border px-2 py-0.5 rounded disabled:opacity-30">↓</button>
               <input defaultValue={s.name} onBlur={e => { if (e.target.value.trim() && e.target.value !== s.name) rinominaSottocategoria(s.id, e.target.value) }} className="border rounded px-2 py-1 flex-1 min-w-[120px]" />
               <label className="text-xs text-slate-500">Sconto %</label>
-              <input type="number" min="0" max="100" step="0.1" defaultValue={Number(s.sconto || 0)} id={'sc-' + s.id} className="w-16 border rounded px-2 py-1 text-sm" />
+              <input type="number" max="0" min="-100" step="0.1" defaultValue={Number(s.sconto || 0) ? -Math.abs(Number(s.sconto || 0)) : 0} id={'sc-' + s.id} className="w-16 border rounded px-2 py-1 text-sm" title="Valore negativo, es. -66" />
               <button type="button" onClick={() => {
                 const el = document.getElementById('sc-' + s.id) as HTMLInputElement
                 setScontoSub(s.id, Number(el?.value || 0))
               }} className="text-xs bg-slate-800 text-white px-2 py-1 rounded">Applica</button>
               <button type="button" onClick={() => eliminaSottocategoria(s.id)} className="text-sm text-red-600">Elimina</button>
             </div>
-          ))}
+          ))
+          })()}
         </div>
       </section>
 
@@ -269,7 +290,9 @@ function SezioneMateriali() {
           {tagCatId && tags.filter(tg => tg.category_id === tagCatId).length === 0 ? (
             <p className="text-sm text-slate-500">Nessun tag in questa categoria</p>
           ) : null}
-          {tags.filter(tg => !tagCatId || tg.category_id === tagCatId).map(tg => (
+          {(() => {
+            const lista = tags.filter(tg => !tagCatId || tg.category_id === tagCatId)
+            return lista.map((tg, i) => (
             editTagId === tg.id ? (
               <div key={tg.id} className="w-full border rounded-lg p-3 space-y-2 bg-slate-50">
                 <input value={editTagNome} onChange={e => setEditTagNome(e.target.value)} className="w-full border rounded-lg px-3 py-2" placeholder="Nome tag" />
@@ -289,12 +312,15 @@ function SezioneMateriali() {
               </div>
             ) : (
               <div key={tg.id} className="flex items-center gap-1 rounded-lg px-2 py-1 text-white text-sm" style={{ backgroundColor: tg.color || '#64748b' }}>
+                <button type="button" onClick={() => sposta('tags', lista, tg.id, -1)} disabled={i === 0} className="text-xs px-1 disabled:opacity-30">↑</button>
+                <button type="button" onClick={() => sposta('tags', lista, tg.id, 1)} disabled={i === lista.length - 1} className="text-xs px-1 disabled:opacity-30">↓</button>
                 <span>{tg.name}</span>
                 <button type="button" onClick={() => avviaModificaTag(tg)} className="ml-1 text-xs underline opacity-90">Modifica</button>
                 <button type="button" onClick={() => eliminaTag(tg.id)} className="ml-1 opacity-90 hover:opacity-100">×</button>
               </div>
             )
-          ))}
+          ))
+          })()}
         </div>
       </section>
     </div>
