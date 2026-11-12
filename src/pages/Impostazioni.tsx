@@ -216,17 +216,20 @@ function SezioneMateriali() {
         <p className="text-sm text-slate-500">Sconto % sul listino per calcolare il netto.</p>
         <div className="flex flex-wrap gap-2">
           <select value={subCatId} onChange={e => setSubCatId(e.target.value)} className="border rounded-lg px-3 py-2">
-            <option value="">Categoria</option>
+            <option value="">Scegli categoria (filtra elenco)</option>
             {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <input value={subNome} onChange={e => setSubNome(e.target.value)} placeholder="Nome sottocategoria" className="border rounded-lg px-3 py-2 flex-1 min-w-[140px]" />
           <button type="button" onClick={creaSottocategoria} className="bg-blue-600 text-white px-4 py-2 rounded-lg">Aggiungi sottocategoria</button>
         </div>
+        <p className="text-sm text-slate-500">Elenco filtrato per la categoria selezionata{subCatId ? ': ' + nomeCat(subCatId) : ''}.</p>
+        {!subCatId ? <p className="text-sm text-amber-700">Seleziona una categoria per vedere le sue sottocategorie.</p> : null}
         <div className="divide-y border rounded-lg">
-          {subcategories.length === 0 ? <p className="p-3 text-sm text-slate-500">Nessuna sottocategoria</p> : null}
-          {subcategories.map(s => (
+          {subCatId && subcategories.filter(s => s.category_id === subCatId).length === 0 ? (
+            <p className="p-3 text-sm text-slate-500">Nessuna sottocategoria in questa categoria</p>
+          ) : null}
+          {subcategories.filter(s => !subCatId || s.category_id === subCatId).map(s => (
             <div key={s.id} className="flex flex-wrap items-center gap-2 p-3">
-              <span className="text-xs text-slate-400 w-28 truncate">{nomeCat(s.category_id)}</span>
               <input defaultValue={s.name} onBlur={e => { if (e.target.value.trim() && e.target.value !== s.name) rinominaSottocategoria(s.id, e.target.value) }} className="border rounded px-2 py-1 flex-1 min-w-[120px]" />
               <label className="text-xs text-slate-500">Sconto %</label>
               <input type="number" min="0" max="100" step="0.1" defaultValue={Number(s.sconto || 0)} id={'sc-' + s.id} className="w-16 border rounded px-2 py-1 text-sm" />
