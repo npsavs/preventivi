@@ -163,7 +163,7 @@ export default function SelezionaMateriali() {
                 <input type="checkbox" checked={!!s} onChange={() => toggle(m.id)} />
                 {m.image_url ? <img src={m.image_url} alt="" className="h-10 w-10 object-contain" /> : null}
                 <div className="flex-1 min-w-[140px]">
-                  <p className="font-medium text-sm">{m.name}</p>
+                  <p className="font-medium text-sm" style={(m as any).evidenziato ? { background: '#bbf7d0', padding: '0 4px', borderRadius: '4px', display: 'inline-block' } : {}}>{m.name}</p>
                   <p className="text-xs text-slate-500">{m.unit} · listino EUR {Number((m as any).prezzo_listino || 0).toFixed(2)} · vendita EUR {Number(m.unit_price).toFixed(2)}</p>
                   {tgs.length > 0 ? (
                     <div className="flex flex-wrap gap-1 mt-1">
