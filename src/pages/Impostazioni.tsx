@@ -83,16 +83,17 @@ function SezioneMateriali() {
   useEffect(() => { load() }, [])
 
 
-  async function sposta(tabella: 'categories' | 'subcategories' | 'tags', lista: any[], id: string, dir: number) {
-    const idx = lista.findIndex(x => x.id === id)
-    const altro = idx + dir
-    if (idx < 0 || altro < 0 || altro >= lista.length) return
-    const a = lista[idx]
-    const b = lista[altro]
-    const ordA = a.sort_order ?? idx * 10
-    const ordB = b.sort_order ?? altro * 10
-    await supabase.from(tabella).update({ sort_order: ordB }).eq('id', a.id)
-    await supabase.from(tabella).update({ sort_order: ordA }).eq('id', b.id)
+  async function riordina(tabella: 'categories' | 'subcategories' | 'tags', lista: any[], daId: string, aId: string) {
+    if (!daId || !aId || daId === aId) return
+    const da = lista.findIndex(x => x.id === daId)
+    const a = lista.findIndex(x => x.id === aId)
+    if (da < 0 || a < 0) return
+    const nuovo = [...lista]
+    const [spostato] = nuovo.splice(da, 1)
+    nuovo.splice(a, 0, spostato)
+    for (let i = 0; i < nuovo.length; i++) {
+      await supabase.from(tabella).update({ sort_order: i }).eq('id', nuovo[i].id)
+    }
     load()
   }
 
@@ -216,10 +217,9 @@ function SezioneMateriali() {
         </div>
         <div className="divide-y border rounded-lg">
           {categories.length === 0 ? <p className="p-3 text-sm text-slate-500">Nessuna categoria</p> : null}
-          {categories.map((c, i) => (
-            <div key={c.id} className="flex flex-wrap items-center gap-2 p-3">
-              <button type="button" disabled={i === 0} onClick={() => sposta('categories', categories, c.id, -1)} className="border px-2 py-0.5 rounded disabled:opacity-30">↑</button>
-              <button type="button" disabled={i === categories.length - 1} onClick={() => sposta('categories', categories, c.id, 1)} className="border px-2 py-0.5 rounded disabled:opacity-30">↓</button>
+          {categories.map(c => (
+            <div key={c.id} draggable onDragStart={e => e.dataTransfer.setData('text/plain', c.id)} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); riordina('categories', categories, e.dataTransfer.getData('text/plain'), c.id) }} className="flex flex-wrap items-center gap-2 p-3 cursor-grab active:cursor-grabbing">
+              <span className="text-slate-400 select-none">⋮⋮</span>
               <input defaultValue={c.name} onBlur={e => { if (e.target.value.trim() && e.target.value !== c.name) rinominaCategoria(c.id, e.target.value) }} className="border rounded px-2 py-1 flex-1 min-w-[140px]" />
               <button type="button" onClick={() => eliminaCategoria(c.id)} className="text-sm text-red-600">Elimina</button>
             </div>
@@ -246,10 +246,9 @@ function SezioneMateriali() {
           ) : null}
           {(() => {
             const lista = subcategories.filter(s => !subCatId || s.category_id === subCatId)
-            return lista.map((s, i) => (
-            <div key={s.id} className="flex flex-wrap items-center gap-2 p-3">
-              <button type="button" disabled={i === 0} onClick={() => sposta('subcategories', lista, s.id, -1)} className="border px-2 py-0.5 rounded disabled:opacity-30">↑</button>
-              <button type="button" disabled={i === lista.length - 1} onClick={() => sposta('subcategories', lista, s.id, 1)} className="border px-2 py-0.5 rounded disabled:opacity-30">↓</button>
+            return lista.map(s => (
+            <div key={s.id} draggable onDragStart={e => e.dataTransfer.setData('text/plain', s.id)} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); riordina('subcategories', lista, e.dataTransfer.getData('text/plain'), s.id) }} className="flex flex-wrap items-center gap-2 p-3 cursor-grab active:cursor-grabbing">
+              <span className="text-slate-400 select-none">⋮⋮</span>
               <input defaultValue={s.name} onBlur={e => { if (e.target.value.trim() && e.target.value !== s.name) rinominaSottocategoria(s.id, e.target.value) }} className="border rounded px-2 py-1 flex-1 min-w-[120px]" />
               <label className="text-xs text-slate-500">Sconto %</label>
               <input type="number" max="0" min="-100" step="0.1" defaultValue={Number(s.sconto || 0) ? -Math.abs(Number(s.sconto || 0)) : 0} id={'sc-' + s.id} className="w-16 border rounded px-2 py-1 text-sm" title="Valore negativo, es. -66" />
@@ -292,7 +291,7 @@ function SezioneMateriali() {
           ) : null}
           {(() => {
             const lista = tags.filter(tg => !tagCatId || tg.category_id === tagCatId)
-            return lista.map((tg, i) => (
+            return lista.map(tg => (
             editTagId === tg.id ? (
               <div key={tg.id} className="w-full border rounded-lg p-3 space-y-2 bg-slate-50">
                 <input value={editTagNome} onChange={e => setEditTagNome(e.target.value)} className="w-full border rounded-lg px-3 py-2" placeholder="Nome tag" />
@@ -311,9 +310,8 @@ function SezioneMateriali() {
                 </div>
               </div>
             ) : (
-              <div key={tg.id} className="flex items-center gap-1 rounded-lg px-2 py-1 text-white text-sm" style={{ backgroundColor: tg.color || '#64748b' }}>
-                <button type="button" onClick={() => sposta('tags', lista, tg.id, -1)} disabled={i === 0} className="text-xs px-1 disabled:opacity-30">↑</button>
-                <button type="button" onClick={() => sposta('tags', lista, tg.id, 1)} disabled={i === lista.length - 1} className="text-xs px-1 disabled:opacity-30">↓</button>
+              <div key={tg.id} draggable onDragStart={e => e.dataTransfer.setData('text/plain', tg.id)} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); riordina('tags', lista, e.dataTransfer.getData('text/plain'), tg.id) }} className="flex items-center gap-1 rounded-lg px-2 py-1 text-white text-sm cursor-grab active:cursor-grabbing" style={{ backgroundColor: tg.color || '#64748b' }}>
+                <span className="cursor-grab">⋮⋮</span>
                 <span>{tg.name}</span>
                 <button type="button" onClick={() => avviaModificaTag(tg)} className="ml-1 text-xs underline opacity-90">Modifica</button>
                 <button type="button" onClick={() => eliminaTag(tg.id)} className="ml-1 opacity-90 hover:opacity-100">×</button>
