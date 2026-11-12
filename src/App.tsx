@@ -12,6 +12,7 @@ import Stampa from './pages/Stampa'
 import Clienti from './pages/Clienti'
 import ImportaPdf from './pages/ImportaPdf'
 import SelezionaMateriali from './pages/SelezionaMateriali'
+import Impostazioni from './pages/Impostazioni'
 
 export default function App() {
   const [session, setSession] = useState<any>(null)
@@ -39,6 +40,8 @@ export default function App() {
           <Route path="lista" element={<Lista />} />
           <Route path="importa" element={<ImportaPdf />} />
           <Route path="catalogo" element={<Catalogo />} />
+          <Route path="impostazioni" element={<Impostazioni />} />
+          <Route path="impostazioni/:sezione" element={<Impostazioni />} />
           <Route path="clienti" element={<Clienti />} />
           <Route path="nuovo" element={<Editor />} />
           <Route path="preventivo/:id" element={<Editor />} />
