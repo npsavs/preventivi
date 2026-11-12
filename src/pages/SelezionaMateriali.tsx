@@ -106,6 +106,7 @@ export default function SelezionaMateriali() {
           <button type="button" onClick={() => navigate('/preventivo/' + id)} className="text-sm border px-3 py-1 rounded-lg">Torna</button>
         </div>
       </div>
+      <div className="sticky top-0 z-30 -mx-1 px-1 pt-1 pb-2 bg-slate-100/95 backdrop-blur space-y-2 border-b border-slate-200">
       <div className="flex flex-wrap gap-2 bg-white p-3 rounded-xl shadow">
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Cerca prodotto..." className="border rounded-lg px-3 py-2 text-sm flex-1 min-w-[160px]" />
         <button type="button" onClick={() => { setCatId(''); setSubId(''); setTagIds([]) }} className={'px-3 py-2 rounded-lg text-sm ' + (!catId ? 'bg-slate-900 text-white' : 'border')}>Tutte</button>
@@ -121,9 +122,10 @@ export default function SelezionaMateriali() {
           ))}
         </div>
       ) : null}
+      </div>
 
       <div className="flex gap-4 items-start">
-        <aside className="w-44 shrink-0 sticky top-4 self-start">
+        <aside className="w-44 shrink-0 sticky top-28 self-start z-10">
           <div className="bg-white rounded-xl shadow p-3 space-y-2 max-h-[calc(100vh-6rem)] overflow-y-auto">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Tag</p>
             {!catId ? (
