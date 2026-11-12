@@ -18,7 +18,7 @@ export default function Catalogo() {
   const [editVendita, setEditVendita] = useState('')
   const [tags, setTags] = useState<any[]>([])
   const [materialTags, setMaterialTags] = useState<any[]>([])
-  const [tagId, setTagId] = useState('')
+  const [tagIds, setTagIds] = useState<string[]>([])
 
   async function spostaMateriale(daId: string, aId: string) {
     if (!daId || daId === aId) return
@@ -82,7 +82,7 @@ export default function Catalogo() {
     await supabase.from('material_tags').delete().eq('tag_id', id)
     const { error } = await supabase.from('tags').delete().eq('id', id)
     if (error) return alert(error.message)
-    if (tagId === id) setTagId('')
+    setTagIds(prev => prev.filter(x => x !== id))
     load()
   }
 
@@ -202,10 +202,15 @@ export default function Catalogo() {
 
   const cats = catId ? categories.filter(c => c.id === catId) : categories
   const subs = subcategories.filter(s => !catId || s.category_id === catId)
+  function toggleFiltroTag(id: string) {
+    setTagIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+
   const match = (m: Material) => {
-    if (tagId) {
-      const ok = materialTags.some(x => x.material_id === m.id && x.tag_id === tagId)
-      if (!ok) return false
+    if (tagIds.length > 0) {
+      const suoi = materialTags.filter(x => x.material_id === m.id).map(x => x.tag_id)
+      // tutti i tag selezionati devono essere sul prodotto
+      if (!tagIds.every(id => suoi.includes(id))) return false
     }
     if (!q.trim()) return true
     const tq = q.toLowerCase()
@@ -217,7 +222,7 @@ export default function Catalogo() {
   const tagsVisibili = tagsDellaCategoria
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex flex-wrap justify-between gap-2">
         <h1 className="text-2xl font-bold">Catalogo materiali</h1>
         <div className="flex gap-2">
@@ -229,9 +234,9 @@ export default function Catalogo() {
 
       <div className="flex flex-wrap gap-2 bg-white p-3 rounded-xl shadow">
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Cerca prodotto..." className="border rounded-lg px-3 py-2 text-sm flex-1 min-w-[160px]" />
-        <button type="button" onClick={() => { setCatId(''); setSubId(''); setTagId('') }} className={'px-3 py-2 rounded-lg text-sm ' + (!catId ? 'bg-slate-900 text-white' : 'border')}>Tutte</button>
+        <button type="button" onClick={() => { setCatId(''); setSubId(''); setTagIds([]) }} className={'px-3 py-2 rounded-lg text-sm ' + (!catId ? 'bg-slate-900 text-white' : 'border')}>Tutte</button>
         {categories.map(c => (
-          <button key={c.id} type="button" onClick={() => { setCatId(c.id); setSubId(''); setTagId('') }} className={'px-3 py-2 rounded-lg text-sm ' + (catId === c.id ? 'bg-slate-900 text-white' : 'border')}>{c.name}</button>
+          <button key={c.id} type="button" onClick={() => { setCatId(c.id); setSubId(''); setTagIds([]) }} className={'px-3 py-2 rounded-lg text-sm ' + (catId === c.id ? 'bg-slate-900 text-white' : 'border')}>{c.name}</button>
         ))}
       </div>
       {catId && subs.length > 0 ? (
@@ -244,20 +249,36 @@ export default function Catalogo() {
       ) : null}
 
       
-      <div className="flex flex-wrap gap-2 items-center bg-white p-3 rounded-xl shadow">
-        <span className="text-sm text-slate-500">Tag:</span>
-        {!catId ? <span className="text-xs text-slate-400">Seleziona una categoria per vedere i tag</span> : null}
-        {catId ? <button type="button" onClick={() => setTagId('')} className={'px-3 py-1.5 rounded-lg text-sm border ' + (!tagId ? 'bg-slate-900 text-white border-slate-900' : '')}>Tutti</button> : null}
-        {tagsVisibili.map(tg => (
-          <button key={tg.id} type="button" onClick={() => setTagId(tagId === tg.id ? '' : tg.id)}
-            className={'px-3 py-1.5 rounded-lg text-sm text-white flex items-center gap-2 ' + (tagId === tg.id ? 'ring-2 ring-offset-1 ring-slate-900' : '')}
-            style={{ backgroundColor: tg.color || '#64748b' }}>
-            {tg.name}
-            <span onClick={e => { e.stopPropagation(); deleteTag(tg.id) }} className="text-xs opacity-80 hover:opacity-100">×</span>
-          </button>
-        ))}
-        {catId ? <Link to="/impostazioni" className="px-3 py-1.5 rounded-lg text-sm border border-dashed">Gestisci tag</Link> : null}
-      </div>
+      <div className="flex gap-4 items-start">
+        <aside className="w-44 shrink-0 sticky top-4 self-start">
+          <div className="bg-white rounded-xl shadow p-3 space-y-2 max-h-[calc(100vh-6rem)] overflow-y-auto">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Tag</p>
+            {!catId ? (
+              <p className="text-xs text-slate-400">Seleziona una categoria</p>
+            ) : (
+              <>
+                <button type="button" onClick={() => setTagIds([])}
+                  className={'w-full text-left px-2 py-1.5 rounded-lg text-sm border ' + (tagIds.length === 0 ? 'bg-slate-900 text-white border-slate-900' : 'bg-white')}>
+                  Tutti
+                </button>
+                {tagsVisibili.map(tg => {
+                  const on = tagIds.includes(tg.id)
+                  return (
+                    <button key={tg.id} type="button" onClick={() => toggleFiltroTag(tg.id)}
+                      className={'w-full text-left px-2 py-1.5 rounded-lg text-sm text-white flex items-center gap-2 ' + (on ? 'ring-2 ring-offset-1 ring-slate-900' : 'opacity-80')}
+                      style={{ backgroundColor: tg.color || '#64748b' }}>
+                      <span className={'w-3 h-3 rounded border shrink-0 ' + (on ? 'bg-white border-white' : 'border-white/70')} />
+                      <span className="truncate">{tg.name}</span>
+                    </button>
+                  )
+                })}
+                {tagsVisibili.length === 0 ? <p className="text-xs text-slate-400">Nessun tag in questa categoria</p> : null}
+                <Link to="/impostazioni" className="block text-xs text-blue-600 pt-1">Gestisci tag</Link>
+              </>
+            )}
+          </div>
+        </aside>
+        <div className="flex-1 min-w-0 space-y-4">
 
       {cats.map(cat => (
         <div key={cat.id} className="bg-white rounded-xl shadow p-4 space-y-3">
@@ -472,6 +493,8 @@ export default function Catalogo() {
           ))}
         </div>
       ))}
+        </div>
+      </div>
     </div>
   )
 }
