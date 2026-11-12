@@ -231,6 +231,7 @@ export default function Catalogo() {
       </div>
       {msg ? <p className="text-green-700 text-sm">{msg}</p> : null}
 
+      <div className="sticky top-0 z-20 -mx-1 px-1 pt-1 pb-2 bg-slate-100 space-y-2">
       <div className="flex flex-wrap gap-2 bg-white p-3 rounded-xl shadow">
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Cerca prodotto..." className="border rounded-lg px-3 py-2 text-sm flex-1 min-w-[160px]" />
         <button type="button" onClick={() => { setCatId(''); setSubId(''); setTagIds([]) }} className={'px-3 py-2 rounded-lg text-sm ' + (!catId ? 'bg-slate-900 text-white' : 'border')}>Tutte</button>
@@ -246,6 +247,7 @@ export default function Catalogo() {
           ))}
         </div>
       ) : null}
+      </div>
 
       
       <div className="flex gap-4 items-start">
