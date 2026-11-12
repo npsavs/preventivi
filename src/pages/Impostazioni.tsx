@@ -65,6 +65,9 @@ function SezioneMateriali() {
   const [tagCatId, setTagCatId] = useState('')
   const [tagNome, setTagNome] = useState('')
   const [tagColor, setTagColor] = useState('#3b82f6')
+  const [editTagId, setEditTagId] = useState('')
+  const [editTagNome, setEditTagNome] = useState('')
+  const [editTagColor, setEditTagColor] = useState('#3b82f6')
 
   async function load() {
     const { data: c } = await supabase.from('categories').select('*').order('name')
@@ -160,7 +163,27 @@ function SezioneMateriali() {
     await supabase.from('material_tags').delete().eq('tag_id', id)
     const { error } = await supabase.from('tags').delete().eq('id', id)
     if (error) return alert(error.message)
+    if (editTagId === id) setEditTagId('')
     setMsg('Tag eliminato')
+    load()
+  }
+
+  function avviaModificaTag(tg: any) {
+    setEditTagId(tg.id)
+    setEditTagNome(tg.name || '')
+    setEditTagColor(tg.color || '#3b82f6')
+  }
+
+  async function salvaModificaTag() {
+    if (!editTagId) return
+    if (!editTagNome.trim()) return alert('Nome tag obbligatorio')
+    const { error } = await supabase.from('tags').update({
+      name: editTagNome.trim(),
+      color: editTagColor,
+    }).eq('id', editTagId)
+    if (error) return alert(error.message)
+    setEditTagId('')
+    setMsg('Tag aggiornato')
     load()
   }
 
@@ -221,11 +244,11 @@ function SezioneMateriali() {
         <h2 className="font-semibold text-lg">Tag</h2>
         <p className="text-sm text-slate-500">Ogni tag appartiene a una sola categoria. In Materiali filtri e assegni ai prodotti.</p>
         <div className="flex flex-wrap gap-2 items-center">
-          <select value={tagCatId} onChange={e => setTagCatId(e.target.value)} className="border rounded-lg px-3 py-2">
-            <option value="">Categoria</option>
+          <select value={tagCatId} onChange={e => { setTagCatId(e.target.value); setEditTagId('') }} className="border rounded-lg px-3 py-2">
+            <option value="">Scegli categoria (filtra elenco)</option>
             {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
-          <input value={tagNome} onChange={e => setTagNome(e.target.value)} placeholder="Nome tag" className="border rounded-lg px-3 py-2 flex-1 min-w-[120px]" />
+          <input value={tagNome} onChange={e => setTagNome(e.target.value)} placeholder="Nome nuovo tag" className="border rounded-lg px-3 py-2 flex-1 min-w-[120px]" />
         </div>
         <div className="flex flex-wrap gap-2 items-center">
           <span className="text-sm text-slate-500">Colore riquadro:</span>
@@ -237,14 +260,37 @@ function SezioneMateriali() {
           <input type="color" value={tagColor} onChange={e => setTagColor(e.target.value)} className="w-10 h-8 border rounded cursor-pointer" title="Colore personalizzato" />
           <button type="button" onClick={creaTag} className="bg-blue-600 text-white px-4 py-2 rounded-lg">Aggiungi tag</button>
         </div>
+        <p className="text-sm text-slate-500">Elenco filtrato per la categoria selezionata sopra{tagCatId ? ': ' + nomeCat(tagCatId) : ''}.</p>
+        {!tagCatId ? <p className="text-sm text-amber-700">Seleziona una categoria per vedere e gestire i suoi tag.</p> : null}
         <div className="flex flex-wrap gap-2">
-          {tags.length === 0 ? <p className="text-sm text-slate-500">Nessun tag</p> : null}
-          {tags.map(tg => (
-            <div key={tg.id} className="flex items-center gap-1 rounded-lg px-2 py-1 text-white text-sm" style={{ backgroundColor: tg.color || '#64748b' }}>
-              <span>{tg.name}</span>
-              <span className="text-xs opacity-80">({nomeCat(tg.category_id)})</span>
-              <button type="button" onClick={() => eliminaTag(tg.id)} className="ml-1 opacity-90 hover:opacity-100">×</button>
-            </div>
+          {tagCatId && tags.filter(tg => tg.category_id === tagCatId).length === 0 ? (
+            <p className="text-sm text-slate-500">Nessun tag in questa categoria</p>
+          ) : null}
+          {tags.filter(tg => !tagCatId || tg.category_id === tagCatId).map(tg => (
+            editTagId === tg.id ? (
+              <div key={tg.id} className="w-full border rounded-lg p-3 space-y-2 bg-slate-50">
+                <input value={editTagNome} onChange={e => setEditTagNome(e.target.value)} className="w-full border rounded-lg px-3 py-2" placeholder="Nome tag" />
+                <div className="flex flex-wrap gap-2 items-center">
+                  <span className="text-sm text-slate-500">Colore:</span>
+                  {COLORI.map(c => (
+                    <button key={c.id} type="button" onClick={() => setEditTagColor(c.id)} title={c.label}
+                      className={'w-7 h-7 rounded border-2 ' + (editTagColor === c.id ? 'border-slate-900' : 'border-transparent')}
+                      style={{ backgroundColor: c.id }} />
+                  ))}
+                  <input type="color" value={editTagColor} onChange={e => setEditTagColor(e.target.value)} className="w-9 h-7 border rounded" />
+                </div>
+                <div className="flex gap-2">
+                  <button type="button" onClick={salvaModificaTag} className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm">Salva</button>
+                  <button type="button" onClick={() => setEditTagId('')} className="border px-3 py-1.5 rounded-lg text-sm">Annulla</button>
+                </div>
+              </div>
+            ) : (
+              <div key={tg.id} className="flex items-center gap-1 rounded-lg px-2 py-1 text-white text-sm" style={{ backgroundColor: tg.color || '#64748b' }}>
+                <span>{tg.name}</span>
+                <button type="button" onClick={() => avviaModificaTag(tg)} className="ml-1 text-xs underline opacity-90">Modifica</button>
+                <button type="button" onClick={() => eliminaTag(tg.id)} className="ml-1 opacity-90 hover:opacity-100">×</button>
+              </div>
+            )
           ))}
         </div>
       </section>
