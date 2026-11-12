@@ -311,6 +311,8 @@ function SezionePreventivi() {
     email: 'nuovopuntosicurezza@gmail.com',
     sito: 'www.nuovopuntosicurezza.com',
     oggetto_default: '',
+    oggetti: [] as string[],
+    descrizioni: [] as string[],
     note_default: `NUOVO PUNTO SICUREZZA SNC E' CERTIFICATA AJAX SU LINEA BASIC SUPERIOR E FIBRA.`,
     validita_giorni: '30',
     iva_default: '22',
@@ -324,19 +326,29 @@ function SezionePreventivi() {
   const [f, setF] = useState({ ...DEFAULT })
   const [msg, setMsg] = useState('')
   const [busy, setBusy] = useState(false)
+  const [nuovoOggetto, setNuovoOggetto] = useState('')
+  const [nuovaDescrizione, setNuovaDescrizione] = useState('')
 
   useEffect(() => {
     async function load() {
       try {
         const { data } = await supabase.from('app_settings').select('value').eq('key', 'preventivi').maybeSingle()
         if (data?.value && typeof data.value === 'object') {
-          setF(prev => ({ ...prev, ...data.value }))
+          const v: any = data.value
+          const oggetti = Array.isArray(v.oggetti) ? v.oggetti : (v.oggetto_default ? [v.oggetto_default] : [])
+          const descrizioni = Array.isArray(v.descrizioni) ? v.descrizioni : []
+          setF(prev => ({ ...prev, ...v, oggetti, descrizioni }))
           return
         }
       } catch {}
       try {
         const raw = localStorage.getItem('nps_preventivi_settings')
-        if (raw) setF(prev => ({ ...prev, ...JSON.parse(raw) }))
+        if (raw) {
+          const v = JSON.parse(raw)
+          const oggetti = Array.isArray(v.oggetti) ? v.oggetti : (v.oggetto_default ? [v.oggetto_default] : [])
+          const descrizioni = Array.isArray(v.descrizioni) ? v.descrizioni : []
+          setF(prev => ({ ...prev, ...v, oggetti, descrizioni }))
+        }
       } catch {}
     }
     load()
@@ -403,11 +415,71 @@ function SezionePreventivi() {
       </section>
 
       <section className="bg-white rounded-xl shadow p-4 space-y-3">
-        <h2 className="font-semibold text-lg">Testi predefiniti</h2>
-        <div>
-          <label className="text-xs text-slate-500">Oggetto di default (nuovo preventivo)</label>
-          <input value={f.oggetto_default} onChange={e => set('oggetto_default', e.target.value)} placeholder="Es. PREVENTIVO IMPIANTO DI ALLARME" className="w-full border rounded-lg px-3 py-2" />
+        <h2 className="font-semibold text-lg">Oggetti preventivo</h2>
+        <p className="text-sm text-slate-500">Li trovi nel menu a tendina quando crei o modifichi un preventivo.</p>
+        <div className="flex flex-wrap gap-2">
+          <input value={nuovoOggetto} onChange={e => setNuovoOggetto(e.target.value)} placeholder="Nuovo oggetto" className="border rounded-lg px-3 py-2 flex-1 min-w-[180px]" />
+          <button type="button" onClick={() => {
+            const v = nuovoOggetto.trim()
+            if (!v) return
+            const list = Array.isArray(f.oggetti) ? [...f.oggetti] : []
+            if (list.includes(v)) return alert('Già presente')
+            set('oggetti', [...list, v])
+            if (!f.oggetto_default) set('oggetto_default', v)
+            setNuovoOggetto('')
+          }} className="bg-blue-600 text-white px-4 py-2 rounded-lg">Aggiungi oggetto</button>
         </div>
+        <div className="divide-y border rounded-lg">
+          {(f.oggetti || []).length === 0 ? <p className="p-3 text-sm text-slate-500">Nessun oggetto salvato</p> : null}
+          {(f.oggetti || []).map((o: string, i: number) => (
+            <div key={i} className="flex flex-wrap items-center gap-2 p-3">
+              <input defaultValue={o} onBlur={e => {
+                const v = e.target.value.trim()
+                if (!v || v === o) return
+                const list = [...(f.oggetti || [])]
+                list[i] = v
+                set('oggetti', list)
+              }} className="border rounded px-2 py-1 flex-1 min-w-[160px]" />
+              <button type="button" onClick={() => set('oggetto_default', o)} className={'text-xs px-2 py-1 rounded border ' + (f.oggetto_default === o ? 'bg-slate-900 text-white' : '')}>Default</button>
+              <button type="button" onClick={() => set('oggetti', (f.oggetti || []).filter((_: string, j: number) => j !== i))} className="text-sm text-red-600">Elimina</button>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="bg-white rounded-xl shadow p-4 space-y-3">
+        <h2 className="font-semibold text-lg">Descrizioni preimpostate</h2>
+        <p className="text-sm text-slate-500">Dopo i prodotti, nel preventivo puoi scegliere una di queste o scrivere liberamente.</p>
+        <div className="flex flex-wrap gap-2">
+          <textarea value={nuovaDescrizione} onChange={e => setNuovaDescrizione(e.target.value)} placeholder="Nuova descrizione" rows={2} className="border rounded-lg px-3 py-2 flex-1 min-w-[180px] text-sm" />
+          <button type="button" onClick={() => {
+            const v = nuovaDescrizione.trim()
+            if (!v) return
+            const list = Array.isArray(f.descrizioni) ? [...f.descrizioni] : []
+            if (list.includes(v)) return alert('Già presente')
+            set('descrizioni', [...list, v])
+            setNuovaDescrizione('')
+          }} className="bg-blue-600 text-white px-4 py-2 rounded-lg h-fit">Aggiungi descrizione</button>
+        </div>
+        <div className="divide-y border rounded-lg">
+          {(f.descrizioni || []).length === 0 ? <p className="p-3 text-sm text-slate-500">Nessuna descrizione salvata</p> : null}
+          {(f.descrizioni || []).map((d: string, i: number) => (
+            <div key={i} className="flex flex-wrap items-start gap-2 p-3">
+              <textarea defaultValue={d} onBlur={e => {
+                const v = e.target.value.trim()
+                if (!v || v === d) return
+                const list = [...(f.descrizioni || [])]
+                list[i] = v
+                set('descrizioni', list)
+              }} rows={2} className="border rounded px-2 py-1 flex-1 min-w-[160px] text-sm" />
+              <button type="button" onClick={() => set('descrizioni', (f.descrizioni || []).filter((_: string, j: number) => j !== i))} className="text-sm text-red-600">Elimina</button>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="bg-white rounded-xl shadow p-4 space-y-3">
+        <h2 className="font-semibold text-lg">Note e validità</h2>
         <div>
           <label className="text-xs text-slate-500">Note a piè di pagina (default)</label>
           <textarea value={f.note_default} onChange={e => set('note_default', e.target.value)} rows={4} className="w-full border rounded-lg px-3 py-2 text-sm" />

@@ -35,6 +35,10 @@ export default function Editor() {
   const [footerNotes, setFooterNotes] = useState(NOTE_DEFAULT)
   const [oggettoDefault, setOggettoDefault] = useState('')
   const [prefissoNum, setPrefissoNum] = useState('')
+  const [oggettiLista, setOggettiLista] = useState<string[]>([])
+  const [descrizioniLista, setDescrizioniLista] = useState<string[]>([])
+  const [descrizione, setDescrizione] = useState('')
+  const [mostraDesc, setMostraDesc] = useState(false)
   const [quoteNumber, setQuoteNumber] = useState('')
   const [sconto, setSconto] = useState('')
   const [dirty, setDirty] = useState(false)
@@ -59,6 +63,9 @@ export default function Editor() {
       }
       if (cfg.oggetto_default) setOggettoDefault(cfg.oggetto_default)
       if (cfg.prefisso_numero) setPrefissoNum(cfg.prefisso_numero)
+      const ogg = Array.isArray(cfg.oggetti) ? cfg.oggetti : (cfg.oggetto_default ? [cfg.oggetto_default] : [])
+      setOggettiLista(ogg)
+      setDescrizioniLista(Array.isArray(cfg.descrizioni) ? cfg.descrizioni : [])
     }
     loadCfg()
   }, [])
@@ -88,7 +95,7 @@ export default function Editor() {
       window.removeEventListener('beforeunload', onLeave)
       document.removeEventListener('click', onClick, true)
     }
-  }, [dirty, modifica, clientId, quoteId, oggetto, footerNotes, quoteNumber, items])
+  }, [dirty, modifica, clientId, quoteId, oggetto, descrizione, footerNotes, quoteNumber, items])
 
   async function scriviRighe() {
     for (const item of items) {
@@ -128,6 +135,7 @@ export default function Editor() {
       client_id: clientId,
       notes: oggetto,
       oggetto,
+      descrizione,
       footer_notes: footerNotes,
       quote_number: quoteNumber,
     }).eq('id', quoteId)
@@ -163,6 +171,8 @@ async function start() {
         setClientId(q.client_id || '')
         setOggetto(q.oggetto || q.notes || '')
         setFooterNotes(q.footer_notes || NOTE_DEFAULT)
+        setDescrizione((q as any).descrizione || '')
+        if ((q as any).descrizione) setMostraDesc(true)
         setQuoteNumber(q.quote_number || '')
       }
       const { data: it } = await supabase.from('quote_items').select('*').eq('quote_id', id)
@@ -197,6 +207,7 @@ async function start() {
       client_id: clientId || null,
       status: 'non_spedito',
       oggetto,
+      descrizione,
       footer_notes: footerNotes,
     }).select().single()
     if (!q) return alert('Errore duplicazione')
@@ -224,6 +235,7 @@ async function start() {
       client_id: clientId,
       notes: oggetto,
       oggetto,
+      descrizione,
       footer_notes: footerNotes,
       quote_number: quoteNumber,
     }).eq('id', quoteId)
@@ -375,7 +387,17 @@ async function start() {
           </>
         ) : null}
         <label className="block text-sm font-medium">Oggetto</label>
-        <textarea value={oggetto} disabled={!modifica} onChange={e => { setOggetto(e.target.value); setDirty(true) }} className="w-full border rounded-lg px-3 py-2" rows={2} />
+        {modifica && oggettiLista.length > 0 ? (
+          <select
+            value={oggettiLista.includes(oggetto) ? oggetto : ''}
+            onChange={e => { if (e.target.value) { setOggetto(e.target.value); setDirty(true) } }}
+            className="w-full border rounded-lg px-3 py-2 mb-2"
+          >
+            <option value="">Scegli oggetto salvato...</option>
+            {oggettiLista.map((o, i) => <option key={i} value={o}>{o}</option>)}
+          </select>
+        ) : null}
+        <textarea value={oggetto} disabled={!modifica} onChange={e => { setOggetto(e.target.value); setDirty(true) }} placeholder="Oppure scrivi un oggetto libero" className="w-full border rounded-lg px-3 py-2" rows={2} />
         <label className="block text-sm font-medium">Note in fondo</label>
         <textarea value={footerNotes} disabled={!modifica} onChange={e => { setFooterNotes(e.target.value); setDirty(true) }} className="w-full border rounded-lg px-3 py-2" rows={4} />
       </div>
@@ -449,6 +471,38 @@ async function start() {
           )
         })}
         <p className="text-right text-xl font-bold">Imponibile EUR {total.toFixed(2)}</p>
+      </div>
+      <div className="bg-white rounded-xl shadow p-4 space-y-3">
+        {!mostraDesc ? (
+          <button type="button" disabled={!modifica} onClick={() => setMostraDesc(true)} className="border px-4 py-2 rounded-lg">
+            + Descrizione
+          </button>
+        ) : (
+          <>
+            <div className="flex justify-between items-center">
+              <h2 className="font-semibold">Descrizione</h2>
+              {modifica ? <button type="button" onClick={() => { setMostraDesc(false); setDescrizione(''); setDirty(true) }} className="text-sm text-red-600">Rimuovi</button> : null}
+            </div>
+            {modifica && descrizioniLista.length > 0 ? (
+              <select
+                value={descrizioniLista.includes(descrizione) ? descrizione : ''}
+                onChange={e => { if (e.target.value) { setDescrizione(e.target.value); setDirty(true) } }}
+                className="w-full border rounded-lg px-3 py-2"
+              >
+                <option value="">Scegli descrizione preimpostata...</option>
+                {descrizioniLista.map((d, i) => <option key={i} value={d}>{d.length > 80 ? d.slice(0, 80) + '…' : d}</option>)}
+              </select>
+            ) : null}
+            <textarea
+              value={descrizione}
+              disabled={!modifica}
+              onChange={e => { setDescrizione(e.target.value); setDirty(true) }}
+              placeholder="Scrivi la descrizione del preventivo"
+              className="w-full border rounded-lg px-3 py-2"
+              rows={4}
+            />
+          </>
+        )}
       </div>
       {modifica ? <button type="button" onClick={saveHeader} className="border px-4 py-2 rounded-lg bg-white">Salva</button> : null}
     </div>

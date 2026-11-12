@@ -215,6 +215,9 @@ export default function Stampa() {
           </div>
         </div>
 
+        {(quote as any).descrizione ? (
+          <div className="mt-6 text-[12px] leading-5 whitespace-pre-wrap">{(quote as any).descrizione}</div>
+        ) : null}
         {quote.footer_notes && (
           <div className="mt-10 text-[11px] leading-5 whitespace-pre-wrap uppercase">{quote.footer_notes}</div>
         )}
