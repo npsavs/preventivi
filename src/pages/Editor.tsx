@@ -176,7 +176,8 @@ async function start() {
         setQuoteNumber(q.quote_number || '')
       }
       const { data: it } = await supabase.from('quote_items').select('*').eq('quote_id', id)
-      setItems(it || [])
+      const ordinati = [...(it || [])].sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+      setItems(ordinati)
       setDirty(false)
       setModifica(false)
     } else {
@@ -277,6 +278,7 @@ async function start() {
       image_url: m.image_url,
       quantity: 1,
       unit: m.unit,
+      sort_order: items.length,
       unit_price: m.unit_price,
       is_discount: false,
     }).select().single()
@@ -320,7 +322,22 @@ async function start() {
     setDirty(true)
   }
 
-  function updateItem(idItem: string, patch: Partial<QuoteItem>) {
+    async function spostaRiga(idx: number, dir: number) {
+    const nuovo = [...items]
+    const a = idx
+    const b = idx + dir
+    if (b < 0 || b >= nuovo.length) return
+    const tmp = nuovo[a]
+    nuovo[a] = nuovo[b]
+    nuovo[b] = tmp
+    setItems(nuovo)
+    setDirty(true)
+    for (let i = 0; i < nuovo.length; i++) {
+      await supabase.from('quote_items').update({ sort_order: i }).eq('id', nuovo[i].id)
+    }
+  }
+
+function updateItem(idItem: string, patch: Partial<QuoteItem>) {
     if (!modifica) return
     setDirty(true)
     setItems(prev => prev.map(i => i.id === idItem ? { ...i, ...patch } : i))
@@ -446,9 +463,15 @@ async function start() {
           }
           return (
             <div key={item.id} className="border rounded-xl p-3 space-y-2">
-              <div className="flex justify-between text-xs text-slate-500">
+              <div className="flex justify-between items-center text-xs text-slate-500">
                 <span>Riga {idx + 1}</span>
-                {modifica ? <button type="button" onClick={() => removeItem(item.id)} className="text-red-600">Elimina riga</button> : null}
+                {modifica ? (
+                  <div className="flex gap-2 items-center">
+                    <button type="button" disabled={idx === 0} onClick={() => spostaRiga(idx, -1)} className="border px-2 py-0.5 rounded disabled:opacity-30" title="Sposta su">↑</button>
+                    <button type="button" disabled={idx === items.length - 1} onClick={() => spostaRiga(idx, 1)} className="border px-2 py-0.5 rounded disabled:opacity-30" title="Sposta giù">↓</button>
+                    <button type="button" onClick={() => removeItem(item.id)} className="text-red-600">Elimina riga</button>
+                  </div>
+                ) : null}
               </div>
               <input value={item.name} disabled={!modifica} onChange={e => updateItem(item.id, { name: e.target.value })} className="w-full border rounded-lg px-3 py-2 font-medium" />
               <textarea value={descPulita} disabled={!modifica} onChange={e => updateItem(item.id, { description: e.target.value + (sconto > 0 ? ' |PREZZO_ORIGINALE:' + prezzoOriginale + '|SCONTO:' + sconto : '') })} className="w-full border rounded-lg px-3 py-2" rows={2} />
