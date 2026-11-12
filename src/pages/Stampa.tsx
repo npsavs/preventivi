@@ -12,8 +12,36 @@ export default function Stampa() {
   const [client, setClient] = useState<any>(null)
   const [items, setItems] = useState<any[]>([])
   const [sending, setSending] = useState(false)
+  const [cfg, setCfg] = useState<any>({
+    ragione_sociale: 'Nuovo Punto Sicurezza snc',
+    indirizzo: 'Via Claudia 48A',
+    cap_citta: '00062 Bracciano (RM)',
+    piva: '05678201004',
+    telefoni: '3386379818 / 3386379820',
+    email: '',
+    sito: '',
+    validita_giorni: '30',
+    email_oggetto: 'Preventivo richiesto',
+    email_corpo: 'Buongiorno,\n\nin allegato il preventivo richiesto.\n\nCordiali saluti\nNuovo Punto Sicurezza',
+    mostra_firme: true,
+    testo_firma_cliente: 'Firma cliente per accettazione',
+    testo_firma_emittente: 'Firma emittente',
+  })
 
   useEffect(() => { load() }, [id])
+  useEffect(() => {
+    async function loadCfg() {
+      try {
+        const { data } = await supabase.from('app_settings').select('value').eq('key', 'preventivi').maybeSingle()
+        if (data?.value) { setCfg((c: any) => ({ ...c, ...data.value })); return }
+      } catch {}
+      try {
+        const raw = localStorage.getItem('nps_preventivi_settings')
+        if (raw) setCfg((c: any) => ({ ...c, ...JSON.parse(raw) }))
+      } catch {}
+    }
+    loadCfg()
+  }, [])
 
   async function load() {
     const { data: q } = await supabase.from('quotes').select('*').eq('id', id).single()
@@ -61,8 +89,8 @@ export default function Stampa() {
       a.href = url
       a.download = nomeFile
       a.click()
-      const oggetto = `Preventivo ${client?.name || 'cliente'}`
-      const testo = `Buongiorno,\n\nin allegato il preventivo richiesto.\n\nCordiali saluti\nNuovo Punto Sicurezza`
+      const oggetto = (cfg.email_oggetto || 'Preventivo') + (client?.name ? ' - ' + client.name : '')
+      const testo = cfg.email_corpo || ''
       if (tipo === 'email') {
         const gmail = 'https://mail.google.com/mail/?view=cm&fs=1' +
           (client?.email ? `&to=${encodeURIComponent(client.email)}` : '') +
@@ -85,7 +113,7 @@ export default function Stampa() {
 
   const imponibile = items.reduce((s, i) => s + Math.round(Number(i.quantity)) * Number(i.unit_price), 0)
   const dataPrev = parseISO(quote.created_at)
-  const validita = addDays(dataPrev, 30)
+  const validita = addDays(dataPrev, Number(cfg.validita_giorni || 30))
   const address = client
     ? [client.address, client.zip, client.city, client.province].filter(Boolean).join(' ')
     : ''
@@ -104,11 +132,13 @@ export default function Stampa() {
           <div className="flex items-start gap-4">
             <img src="/logo.png" alt="NPS" className="h-[80px] w-[80px] object-contain" />
             <div className="text-[11px] leading-5">
-              <p className="font-semibold">Nuovo Punto Sicurezza snc</p>
-              <p>Via Claudia 48A</p>
-              <p>00062 - Bracciano (RM) - Italy</p>
-              <p>P.IVA 05678201004</p>
-              <p>Tel: 3386379818 / 3386379820</p>
+              <p className="font-semibold">{cfg.ragione_sociale}</p>
+              <p>{cfg.indirizzo}</p>
+              <p>{cfg.cap_citta}</p>
+              <p>P.IVA {cfg.piva}</p>
+              <p>Tel: {cfg.telefoni}</p>
+              {cfg.email ? <p>{cfg.email}</p> : null}
+              {cfg.sito ? <p>{cfg.sito}</p> : null}
             </div>
           </div>
           <div className="text-right text-[11px] leading-5">

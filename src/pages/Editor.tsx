@@ -33,10 +33,35 @@ export default function Editor() {
   const [searchProd, setSearchProd] = useState('')
   const [oggetto, setOggetto] = useState('')
   const [footerNotes, setFooterNotes] = useState(NOTE_DEFAULT)
+  const [oggettoDefault, setOggettoDefault] = useState('')
+  const [prefissoNum, setPrefissoNum] = useState('')
   const [quoteNumber, setQuoteNumber] = useState('')
   const [sconto, setSconto] = useState('')
   const [dirty, setDirty] = useState(false)
   const [modifica, setModifica] = useState(!id)
+
+  useEffect(() => {
+    async function loadCfg() {
+      let cfg: any = null
+      try {
+        const { data } = await supabase.from('app_settings').select('value').eq('key', 'preventivi').maybeSingle()
+        if (data?.value) cfg = data.value
+      } catch {}
+      if (!cfg) {
+        try {
+          const raw = localStorage.getItem('nps_preventivi_settings')
+          if (raw) cfg = JSON.parse(raw)
+        } catch {}
+      }
+      if (!cfg) return
+      if (cfg.note_default) {
+        setFooterNotes(prev => (eNuovo || !prev || prev === NOTE_DEFAULT) ? cfg.note_default : prev)
+      }
+      if (cfg.oggetto_default) setOggettoDefault(cfg.oggetto_default)
+      if (cfg.prefisso_numero) setPrefissoNum(cfg.prefisso_numero)
+    }
+    loadCfg()
+  }, [])
   const [newClient, setNewClient] = useState({ name: '', phone: '', email: '', address: '', city: '' })
 
   useEffect(() => { start() }, [])
@@ -157,6 +182,7 @@ async function start() {
         setQuoteNumber(num)
         if (clienteFromUrl) setClientId(clienteFromUrl)
         setModifica(true)
+        if (oggettoDefault) setOggetto(oggettoDefault)
         setDirty(true)
         navigate('/preventivo/' + q.id, { replace: true })
       }
@@ -412,11 +438,11 @@ async function start() {
                     <button type="button" disabled={!modifica} onClick={() => updateItem(item.id, { quantity: Math.round(Number(item.quantity)) + 1 })} className="w-8 h-8 border rounded text-lg">+</button>
                   </>
                 ) : null}
-                <span className="text-slate-500">Prezzo originale</span>
-                <input type="number" step="0.01" disabled={!modifica} value={prezzoOriginale} onChange={e => cambiaOriginale(Number(e.target.value))} className="w-24 border rounded-lg px-2 py-1" />
+                <span className="text-black font-semibold text-sm">Prezzo di vendita</span>
+                <input type="number" step="0.01" disabled={!modifica} value={prezzoOriginale} onChange={e => cambiaOriginale(Number(e.target.value))} className="w-28 border-2 border-slate-800 rounded-lg px-2 py-1 font-semibold" />
                 <span className="text-slate-500">Sconto %</span>
                 <input type="number" min="0" max="100" disabled={!modifica} value={sconto} onChange={e => cambiaSconto(Number(e.target.value))} className="w-16 border rounded-lg px-2 py-1" />
-                {sconto > 0 ? <span className="text-red-600">EUR {Number(item.unit_price).toFixed(2)}</span> : null}
+                {sconto > 0 ? <span className="text-red-600 font-medium">Dopo sconto EUR {Number(item.unit_price).toFixed(2)}</span> : null}
                 <span className="ml-auto font-medium">EUR {(Math.round(Number(item.quantity)) * Number(item.unit_price)).toFixed(2)}</span>
               </div>
             </div>
