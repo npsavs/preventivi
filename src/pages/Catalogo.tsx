@@ -60,6 +60,7 @@ export default function Catalogo() {
 
 
   async function addTag() {
+    if (!catId) return alert('Seleziona prima una categoria: i tag appartengono a una sola categoria')
     const nome = prompt('Nome del tag')
     if (!nome || !nome.trim()) return
     const colori = ['#3b82f6', '#22c55e', '#eab308', '#ef4444', '#a855f7', '#f97316', '#06b6d4', '#64748b']
@@ -71,7 +72,7 @@ export default function Catalogo() {
       if (n >= 1 && n <= 8) color = colori[n - 1]
       else if (scelta.startsWith('#')) color = scelta.trim()
     }
-    const { error } = await supabase.from('tags').insert({ name: nome.trim(), color })
+    const { error } = await supabase.from('tags').insert({ name: nome.trim(), color, category_id: catId })
     if (error) return alert(error.message)
     load()
   }
@@ -211,13 +212,16 @@ export default function Catalogo() {
     return m.name.toLowerCase().includes(tq) || (m.description || '').toLowerCase().includes(tq)
   }
 
+  // Tag solo della categoria selezionata; con "Tutte" nessun tag in barra
+  const tagsDellaCategoria = catId ? tags.filter(tg => tg.category_id === catId) : []
+  const tagsVisibili = tagsDellaCategoria
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap justify-between gap-2">
         <h1 className="text-2xl font-bold">Catalogo materiali</h1>
         <div className="flex gap-2">
-          <button type="button" onClick={addCategory} className="border px-4 py-2 rounded-lg text-sm">+ Categoria</button>
-          <button type="button" onClick={addSubcategory} className="border px-4 py-2 rounded-lg text-sm">+ Sottocategoria</button>
+          <Link to="/impostazioni" className="border px-4 py-2 rounded-lg text-sm">Impostazioni categorie / tag</Link>
           <Link to={'/materiale/nuovo' + (catId ? '?cat=' + catId : '') + (subId ? '&sub=' + subId : '')} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">+ Nuovo prodotto</Link>
         </div>
       </div>
@@ -225,9 +229,9 @@ export default function Catalogo() {
 
       <div className="flex flex-wrap gap-2 bg-white p-3 rounded-xl shadow">
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Cerca prodotto..." className="border rounded-lg px-3 py-2 text-sm flex-1 min-w-[160px]" />
-        <button type="button" onClick={() => { setCatId(''); setSubId('') }} className={'px-3 py-2 rounded-lg text-sm ' + (!catId ? 'bg-slate-900 text-white' : 'border')}>Tutte</button>
+        <button type="button" onClick={() => { setCatId(''); setSubId(''); setTagId('') }} className={'px-3 py-2 rounded-lg text-sm ' + (!catId ? 'bg-slate-900 text-white' : 'border')}>Tutte</button>
         {categories.map(c => (
-          <button key={c.id} type="button" onClick={() => { setCatId(c.id); setSubId('') }} className={'px-3 py-2 rounded-lg text-sm ' + (catId === c.id ? 'bg-slate-900 text-white' : 'border')}>{c.name}</button>
+          <button key={c.id} type="button" onClick={() => { setCatId(c.id); setSubId(''); setTagId('') }} className={'px-3 py-2 rounded-lg text-sm ' + (catId === c.id ? 'bg-slate-900 text-white' : 'border')}>{c.name}</button>
         ))}
       </div>
       {catId && subs.length > 0 ? (
@@ -242,8 +246,9 @@ export default function Catalogo() {
       
       <div className="flex flex-wrap gap-2 items-center bg-white p-3 rounded-xl shadow">
         <span className="text-sm text-slate-500">Tag:</span>
-        <button type="button" onClick={() => setTagId('')} className={'px-3 py-1.5 rounded-lg text-sm border ' + (!tagId ? 'bg-slate-900 text-white border-slate-900' : '')}>Tutti</button>
-        {tags.map(tg => (
+        {!catId ? <span className="text-xs text-slate-400">Seleziona una categoria per vedere i tag</span> : null}
+        {catId ? <button type="button" onClick={() => setTagId('')} className={'px-3 py-1.5 rounded-lg text-sm border ' + (!tagId ? 'bg-slate-900 text-white border-slate-900' : '')}>Tutti</button> : null}
+        {tagsVisibili.map(tg => (
           <button key={tg.id} type="button" onClick={() => setTagId(tagId === tg.id ? '' : tg.id)}
             className={'px-3 py-1.5 rounded-lg text-sm text-white flex items-center gap-2 ' + (tagId === tg.id ? 'ring-2 ring-offset-1 ring-slate-900' : '')}
             style={{ backgroundColor: tg.color || '#64748b' }}>
@@ -251,7 +256,7 @@ export default function Catalogo() {
             <span onClick={e => { e.stopPropagation(); deleteTag(tg.id) }} className="text-xs opacity-80 hover:opacity-100">×</span>
           </button>
         ))}
-        <button type="button" onClick={addTag} className="px-3 py-1.5 rounded-lg text-sm border border-dashed">+ Aggiungi tag</button>
+        {catId ? <Link to="/impostazioni" className="px-3 py-1.5 rounded-lg text-sm border border-dashed">Gestisci tag</Link> : null}
       </div>
 
       {cats.map(cat => (
@@ -356,7 +361,7 @@ export default function Catalogo() {
                         <select className="text-xs border rounded px-1 py-0.5" defaultValue=""
                           onChange={e => { if (e.target.value) { toggleTagMateriale(m.id, e.target.value); e.target.value = '' } }}>
                           <option value="">+ Tag</option>
-                          {tags.filter(tg => !materialTags.some(x => x.material_id === m.id && x.tag_id === tg.id)).map(tg => (
+                          {tags.filter(tg => tg.category_id === m.category_id && !materialTags.some(x => x.material_id === m.id && x.tag_id === tg.id)).map(tg => (
                             <option key={tg.id} value={tg.id}>{tg.name}</option>
                           ))}
                         </select>
@@ -451,7 +456,7 @@ export default function Catalogo() {
                     <select className="text-xs border rounded px-1 py-0.5" defaultValue=""
                       onChange={e => { if (e.target.value) { toggleTagMateriale(m.id, e.target.value); e.target.value = '' } }}>
                       <option value="">+ Tag</option>
-                      {tags.filter(tg => !materialTags.some(x => x.material_id === m.id && x.tag_id === tg.id)).map(tg => (
+                      {tags.filter(tg => tg.category_id === m.category_id && !materialTags.some(x => x.material_id === m.id && x.tag_id === tg.id)).map(tg => (
                         <option key={tg.id} value={tg.id}>{tg.name}</option>
                       ))}
                     </select>
