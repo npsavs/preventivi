@@ -51,7 +51,8 @@ export default function Stampa() {
       setClient(c)
     }
     const { data: it } = await supabase.from('quote_items').select('*').eq('quote_id', id)
-    setItems(it || [])
+    const ordinati = [...(it || [])].sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+    setItems(ordinati)
   }
 
   async function creaPdf() {
