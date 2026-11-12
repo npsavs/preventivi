@@ -226,7 +226,6 @@ export default function Catalogo() {
       <div className="flex flex-wrap justify-between gap-2">
         <h1 className="text-2xl font-bold">Catalogo materiali</h1>
         <div className="flex gap-2">
-          <Link to="/impostazioni" className="border px-4 py-2 rounded-lg text-sm">Impostazioni categorie / tag</Link>
           <Link to={'/materiale/nuovo' + (catId ? '?cat=' + catId : '') + (subId ? '&sub=' + subId : '')} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">+ Nuovo prodotto</Link>
         </div>
       </div>
@@ -273,7 +272,6 @@ export default function Catalogo() {
                   )
                 })}
                 {tagsVisibili.length === 0 ? <p className="text-xs text-slate-400">Nessun tag in questa categoria</p> : null}
-                <Link to="/impostazioni" className="block text-xs text-blue-600 pt-1">Gestisci tag</Link>
               </>
             )}
           </div>
